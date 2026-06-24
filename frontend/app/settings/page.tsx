@@ -5,7 +5,7 @@ import { Sidebar } from "@/components/hrm/sidebar"
 import { Topbar } from "@/components/hrm/topbar"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { MapPin, Loader2 } from "lucide-react"
+import { MapPin, Loader2, Lock, Unlock } from "lucide-react"
 import { settingsService } from "@/services/settings"
 
 export default function SettingsPage() {
@@ -15,6 +15,9 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false)
   const [gettingLocation, setGettingLocation] = useState(false)
 
+  const [deviceLockEnabled, setDeviceLockEnabled] = useState(false)
+  const [savingDeviceLock, setSavingDeviceLock] = useState(false)
+
   useEffect(() => {
     settingsService.get().then(res => {
       if (res.data.company_lat) {
@@ -22,6 +25,7 @@ export default function SettingsPage() {
         setLng(String(res.data.company_lng))
         setMaxDistance(String(res.data.max_distance || 500))
       }
+      setDeviceLockEnabled(!!res.data.device_lock_enabled)
     }).catch(() => {})
   }, [])
 
@@ -65,6 +69,19 @@ export default function SettingsPage() {
     }
   }
 
+  const handleToggleDeviceLock = async () => {
+    const newValue = !deviceLockEnabled
+    try {
+      setSavingDeviceLock(true)
+      await settingsService.updateDeviceLock(newValue)
+      setDeviceLockEnabled(newValue)
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Lỗi khi cập nhật Device Lock")
+    } finally {
+      setSavingDeviceLock(false)
+    }
+  }
+
   return (
     <div className="flex min-h-screen bg-muted/40">
       <Sidebar />
@@ -72,11 +89,12 @@ export default function SettingsPage() {
         <Topbar />
         <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
           <div className="mb-6">
-            <h2 className="text-xl font-semibold">Cài đặt vị trí công ty</h2>
-            <p className="text-sm text-muted-foreground">Dùng để xác thực GPS khi nhân viên chấm công qua app</p>
+            <h2 className="text-xl font-semibold">Cài đặt hệ thống</h2>
+            <p className="text-sm text-muted-foreground">Vị trí công ty và bảo mật thiết bị</p>
           </div>
 
           <Card className="p-6 max-w-md">
+            <h3 className="text-sm font-semibold mb-3">Vị trí công ty</h3>
             <Button
               variant="outline"
               className="w-full gap-2 mb-4"
@@ -121,6 +139,34 @@ export default function SettingsPage() {
               {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Lưu cài đặt
             </Button>
+          </Card>
+
+          <Card className="p-6 max-w-md mt-4">
+            <div className="flex items-center gap-2 mb-1">
+              {deviceLockEnabled ? <Lock className="h-4 w-4 text-emerald-600" /> : <Unlock className="h-4 w-4 text-muted-foreground" />}
+              <h3 className="text-sm font-semibold">Khóa thiết bị (Device Lock)</h3>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Chỉ cho phép đăng nhập từ 1 thiết bị duy nhất cho mỗi tài khoản (trừ Admin). Tắt khi cần test trên nhiều máy, bật khi demo thật.
+            </p>
+
+            <button
+              type="button"
+              onClick={handleToggleDeviceLock}
+              disabled={savingDeviceLock}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                deviceLockEnabled ? "bg-primary" : "bg-muted-foreground/30"
+              } ${savingDeviceLock ? "opacity-50" : ""}`}
+            >
+              <span
+                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                  deviceLockEnabled ? "translate-x-5" : "translate-x-0.5"
+                }`}
+              />
+            </button>
+            <span className="ml-3 text-sm font-medium">
+              {deviceLockEnabled ? "Đang bật" : "Đang tắt"}
+            </span>
           </Card>
         </main>
       </div>

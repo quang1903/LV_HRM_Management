@@ -44,14 +44,24 @@ export async function login(req, res) {
       return res.status(401).json({ message: "Email hoặc mật khẩu không đúng" })
     }
 
-    // Device Lock: chặn nếu đăng nhập từ thiết bị khác với thiết bị đã đăng ký
-    if (user.device_id && device_id && user.device_id !== device_id) {
-      return res.status(403).json({ message: "Thiết bị không hợp lệ! Vui lòng dùng thiết bị đã đăng ký hoặc liên hệ Admin để reset." })
-    }
+    // Kiểm tra Device Lock có đang bật trong settings không
+    const [settingsRows] = await pool.execute("SELECT device_lock_enabled FROM settings WHERE id = 1")
+    const deviceLockEnabled = settingsRows.length > 0 ? settingsRows[0].device_lock_enabled === 1 : false
 
-    // Lần đầu đăng nhập (chưa có device_id) thì lưu lại
-    if (!user.device_id && device_id) {
-      await pool.execute("UPDATE users SET device_id = ? WHERE id = ?", [device_id, user.id])
+    // Device Lock: KHÔNG áp dụng cho Admin, và chỉ áp dụng khi setting đang bật
+    if (user.role !== "admin" && deviceLockEnabled) {
+      if (user.device_id) {
+        if (!device_id) {
+          return res.status(403).json({ message: "Thiếu thông tin thiết bị! Vui lòng đăng nhập từ ứng dụng hợp lệ." })
+        }
+        if (user.device_id !== device_id) {
+          return res.status(403).json({ message: "Thiết bị không hợp lệ! Vui lòng dùng thiết bị đã đăng ký hoặc liên hệ Admin để reset." })
+        }
+      }
+
+      if (!user.device_id && device_id) {
+        await pool.execute("UPDATE users SET device_id = ? WHERE id = ?", [device_id, user.id])
+      }
     }
 
     await pool.execute("UPDATE users SET last_login_at = NOW() WHERE id = ?", [user.id])
