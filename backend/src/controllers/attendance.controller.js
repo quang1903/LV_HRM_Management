@@ -138,14 +138,13 @@ export async function checkIn(req, res) {
     )
     if (employees.length === 0) return res.status(404).json({ message: "Không tìm thấy nhân viên" })
     const employee = employees[0]
-    const today = new Date().toISOString().split('T')[0]
+    const { now, nowVN, today } = getVietnamTime()
     const [existing] = await pool.execute(
       "SELECT id, check_in FROM attendances WHERE employee_id = ? AND work_date = ?",
       [employee.id, today]
     )
     if (existing.length > 0 && existing[0].check_in) return res.status(400).json({ message: "Nhân viên đã check-in hôm nay" })
-    const now = new Date()
-    const hour = now.getHours(), minute = now.getMinutes()
+    const hour = nowVN.getHours(), minute = nowVN.getMinutes()
     const status = (hour > 8 || (hour === 8 && minute > 30)) ? "Di tre" : "Dung gio"
     if (existing.length === 0) {
       await pool.execute(
@@ -198,6 +197,14 @@ export async function checkOut(req, res) {
   }
 }
 
+// Lấy ngày/giờ hiện tại theo múi giờ Việt Nam (chỉ dùng để TÍNH today/status, không dùng để LƯU vào DB)
+function getVietnamTime() {
+  const now = new Date()
+  const nowVN = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" }))
+  const today = nowVN.getFullYear() + "-" + String(nowVN.getMonth() + 1).padStart(2, "0") + "-" + String(nowVN.getDate()).padStart(2, "0")
+  return { now, nowVN, today }
+}
+
 function getDistanceMeters(lat1, lng1, lat2, lng2) {
   const R = 6371000
   const dLat = (lat2 - lat1) * Math.PI / 180
@@ -226,7 +233,7 @@ export async function selfCheckIn(req, res) {
       return res.status(403).json({ message: `Bạn đang ở ngoài phạm vi công ty (${Math.round(distance)}m)` })
     }
 
-    const today = new Date().toISOString().split('T')[0]
+    const { now, nowVN, today } = getVietnamTime()
     const [existing] = await pool.execute(
       "SELECT id, check_in FROM attendances WHERE employee_id = ? AND work_date = ?",
       [req.user.employee_id, today]
@@ -235,9 +242,8 @@ export async function selfCheckIn(req, res) {
       return res.status(400).json({ message: "Bạn đã check-in hôm nay" })
     }
 
-    const now = new Date()
-    const hour = now.getHours()
-    const minute = now.getMinutes()
+    const hour = nowVN.getHours()
+    const minute = nowVN.getMinutes()
     const status = (hour > 8 || (hour === 8 && minute > 30)) ? "Di tre" : "Dung gio"
 
     if (existing.length === 0) {
