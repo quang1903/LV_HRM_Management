@@ -11,6 +11,7 @@ import reportRoutes from "./routes/report.routes.js"
 import userRoutes from "./routes/user.routes.js"
 import positionRoutes from "./routes/position.routes.js"
 import settingsRoutes from "./routes/settings.routes.js"
+import profileRequestRoutes from "./routes/profileRequest.routes.js"
 
 dotenv.config()
 
@@ -30,6 +31,7 @@ app.use("/api/reports",     reportRoutes)
 app.use("/api/users",       userRoutes)
 app.use("/api/positions", positionRoutes)
 app.use("/api/settings", settingsRoutes)
+app.use("/api/profile-requests", profileRequestRoutes)
 
 app.get("/", (req, res) => {
   res.json({ message: "HRM API đang chạy 🚀" })

@@ -36,6 +36,8 @@ const PAGE_PERMISSIONS: Record<string, UserRole[]> = {
   "/contracts":   ["admin", "hr", "manager"],
   "/reports":     ["admin", "hr", "manager"],
   "/users":       ["admin"],
+  "/profile":     ["admin", "hr", "manager", "employee"],
+  "/profile-requests": ["admin", "hr"],
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)

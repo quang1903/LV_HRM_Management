@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
 import {
   LayoutDashboard, Users, Building2, Clock,
-  CalendarDays, FileText, BarChart3, LogOut, Briefcase, Shield, Settings, X
+  CalendarDays, FileText, BarChart3, LogOut, Briefcase, Shield, Settings, X, UserCircle, ClipboardCheck
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/context/AuthContext"
@@ -20,6 +20,8 @@ const mainMenu = [
   { key: "reports",     label: "Báo cáo",    icon: BarChart3,       href: "/reports" },
   { key: "users",       label: "Người dùng", icon: Shield,          href: "/users" },
   { key: "settings",    label: "Cài đặt",    icon: Settings,        href: "/settings", roles: ["admin"] },
+  { key: "profile-requests", label: "Yêu cầu thay đổi", icon: ClipboardCheck, href: "/profile-requests" },
+  { key: "profile",     label: "Trang cá nhân", icon: UserCircle,   href: "/profile" },
 ]
 
 function getInitials(name: string) {

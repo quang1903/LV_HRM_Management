@@ -156,3 +156,27 @@ export async function getMe(req, res) {
     return res.status(500).json({ message: "Lỗi server" })
   }
 }
+
+export async function changePassword(req, res) {
+  try {
+    const { old_password, new_password } = req.body
+    if (!old_password || !new_password) {
+      return res.status(400).json({ message: "Vui lòng nhập đầy đủ thông tin" })
+    }
+    if (new_password.length < 6) {
+      return res.status(400).json({ message: "Mật khẩu mới phải có ít nhất 6 ký tự" })
+    }
+    const [rows] = await pool.execute("SELECT password FROM users WHERE id = ?", [req.user.id])
+    if (rows.length === 0) return res.status(404).json({ message: "Không tìm thấy tài khoản" })
+
+    const isMatch = await bcrypt.compare(old_password, rows[0].password)
+    if (!isMatch) return res.status(400).json({ message: "Mật khẩu hiện tại không đúng" })
+
+    const hashed = await bcrypt.hash(new_password, 10)
+    await pool.execute("UPDATE users SET password = ? WHERE id = ?", [hashed, req.user.id])
+    return res.json({ message: "Đổi mật khẩu thành công" })
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ message: "Lỗi server" })
+  }
+}
