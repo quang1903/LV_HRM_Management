@@ -7,9 +7,12 @@ export async function getUsers(req, res) {
   try {
     const [rows] = await pool.execute(`
       SELECT u.id, u.username, u.email, u.role, u.is_active, u.last_login_at, u.created_at,
-             e.full_name, e.employee_code
+             u.employee_id,
+             e.full_name, e.employee_code, e.department_id,
+             d.name as department_name
       FROM users u
       LEFT JOIN employees e ON u.employee_id = e.id
+      LEFT JOIN departments d ON e.department_id = d.id
       ORDER BY u.created_at DESC
     `)
     return res.json(rows)
@@ -105,6 +108,73 @@ export async function resetDevice(req, res) {
     await pool.execute("UPDATE users SET device_id = NULL WHERE id = ?", [req.params.id])
     return res.json({ message: "Đã reset thiết bị, nhân viên có thể đăng nhập lại từ máy mới" })
   } catch (err) {
+    return res.status(500).json({ message: "Lỗi server" })
+  }
+}
+
+export async function resetDeviceByEmployee(req, res) {
+  try {
+    const employeeId = req.params.id // ID của NHÂN VIÊN (employees.id), không phải user.id
+
+    const [userRows] = await pool.execute("SELECT id FROM users WHERE employee_id = ?", [employeeId])
+    if (userRows.length === 0) return res.status(404).json({ message: "Nhân viên chưa có tài khoản" })
+
+    // Nếu là Manager, kiểm tra nhân viên có thuộc phòng ban mình quản lý không
+    if (req.user.role === "manager") {
+      const [emp] = await pool.execute("SELECT department_id FROM employees WHERE id = ?", [employeeId])
+      if (emp.length === 0) return res.status(404).json({ message: "Không tìm thấy nhân viên" })
+
+      const [dept] = await pool.execute(
+        "SELECT id FROM departments WHERE id = ? AND manager_id = ?",
+        [emp[0].department_id, req.user.employee_id]
+      )
+      if (dept.length === 0) {
+        return res.status(403).json({ message: "Bạn chỉ được reset thiết bị cho nhân viên thuộc phòng ban mình quản lý" })
+      }
+    }
+
+    await pool.execute("UPDATE users SET device_id = NULL WHERE id = ?", [userRows[0].id])
+    return res.json({ message: "Đã reset thiết bị, nhân viên có thể đăng nhập lại từ máy mới" })
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ message: "Lỗi server" })
+  }
+}
+
+export async function resetDeviceByDepartment(req, res) {
+  try {
+    const departmentId = req.params.deptId
+
+    // Nếu là Manager, chỉ cho reset đúng phòng mình quản lý
+    if (req.user.role === "manager") {
+      const [dept] = await pool.execute(
+        "SELECT id FROM departments WHERE id = ? AND manager_id = ?",
+        [departmentId, req.user.employee_id]
+      )
+      if (dept.length === 0) {
+        return res.status(403).json({ message: "Bạn chỉ được reset thiết bị cho phòng ban mình quản lý" })
+      }
+    }
+
+    const [userRows] = await pool.execute(`
+      SELECT u.id FROM users u
+      INNER JOIN employees e ON u.employee_id = e.id
+      WHERE e.department_id = ?
+    `, [departmentId])
+
+    if (userRows.length === 0) {
+      return res.json({ message: "Không có tài khoản nào trong phòng ban này", resetCount: 0 })
+    }
+
+    const userIds = userRows.map(r => r.id)
+    await pool.execute(
+      `UPDATE users SET device_id = NULL WHERE id IN (${userIds.map(() => "?").join(",")})`,
+      userIds
+    )
+
+    return res.json({ message: `Đã reset thiết bị cho ${userIds.length} nhân viên`, resetCount: userIds.length })
+  } catch (err) {
+    console.error(err)
     return res.status(500).json({ message: "Lỗi server" })
   }
 }

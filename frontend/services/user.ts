@@ -6,4 +6,5 @@ export const userService = {
   toggle: (id: number) => api.patch(`/users/${id}/toggle`),
   resetPassword: (id: number, data: any) => api.patch(`/users/${id}/reset-password`, data),
   resetDevice: (id: number) => api.patch(`/users/${id}/reset-device`),
+  resetDeviceByEmployee: (employeeId: number) => api.patch(`/users/employee/${employeeId}/reset-device`),
 }

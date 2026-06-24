@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { exportToExcel } from "@/lib/exportExcel"
 import { Download, Users, Clock, FileText, TrendingUp, Loader2 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -115,7 +116,17 @@ export function ReportsPanel() {
         <Card className="p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold">Báo cáo chấm công tháng {month}/{year}</h3>
-            <Button variant="outline" size="sm" className="gap-2"><Download className="h-4 w-4" />Xuất Excel</Button>
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => exportToExcel(
+  attendanceData,
+  [
+    { key: "full_name", label: "Nhân viên" },
+    { key: "department_name", label: "Phòng ban" },
+    { key: "on_time", label: "Đúng giờ" },
+    { key: "late", label: "Đi trễ" },
+    { key: "absent", label: "Vắng mặt" },
+  ],
+  `Cham_cong_thang_${month}_${year}`
+)}><Download className="h-4 w-4" />Xuất Excel</Button>
           </div>
           {loadingAttendance ? <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : (
             <div className="overflow-x-auto">
@@ -157,7 +168,17 @@ export function ReportsPanel() {
         <Card className="p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold">Báo cáo nhân sự theo phòng ban</h3>
-            <Button variant="outline" size="sm" className="gap-2"><Download className="h-4 w-4" />Xuất Excel</Button>
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => exportToExcel(
+  departmentData,
+  [
+    { key: "department_name", label: "Phòng ban" },
+    { key: "manager_name", label: "Trưởng phòng" },
+    { key: "active", label: "Đang làm" },
+    { key: "inactive", label: "Đã nghỉ" },
+    { key: "total_employees", label: "Tổng" },
+  ],
+  "Bao_cao_phong_ban"
+)}><Download className="h-4 w-4" />Xuất Excel</Button>
           </div>
           {loadingDepartment ? <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : (
             <div className="overflow-x-auto">
@@ -193,7 +214,17 @@ export function ReportsPanel() {
         <Card className="p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold">Báo cáo nghỉ phép tháng {month}/{year}</h3>
-            <Button variant="outline" size="sm" className="gap-2"><Download className="h-4 w-4" />Xuất Excel</Button>
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => exportToExcel(
+  leaveData.filter(e => e.total_requests > 0),
+  [
+    { key: "full_name", label: "Nhân viên" },
+    { key: "department_name", label: "Phòng ban" },
+    { key: "approved_days", label: "Đã duyệt (ngày)" },
+    { key: "pending", label: "Chờ duyệt" },
+    { key: "rejected", label: "Từ chối" },
+  ],
+  `Nghi_phep_thang_${month}_${year}`
+)}><Download className="h-4 w-4" />Xuất Excel</Button>
           </div>
           {loadingLeave ? <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : (
             <div className="overflow-x-auto">

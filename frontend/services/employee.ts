@@ -8,4 +8,7 @@ export const employeeService = {
   activate: (id: number) => api.patch(`/employees/${id}/activate`),
   permanentDelete: (id: number) => api.delete(`/employees/${id}/permanent`),
   getMyQR: () => api.get("/employees/my-qr"),
+  importEmployees: (data: any[]) => api.post("/employees/import", { data }),
+  resetDevice: (employeeId: number) => api.patch(`/users/employee/${employeeId}/reset-device`),
+  resetDeviceByDepartment: (deptId: number) => api.patch(`/users/department/${deptId}/reset-device`),
 }

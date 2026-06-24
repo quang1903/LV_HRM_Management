@@ -1,10 +1,11 @@
 import { Router } from "express"
-import { getEmployees, getEmployeeById, createEmployee, updateEmployee, deactivateEmployee, activateEmployee, permanentDelete, getMyQRSecret } from "../controllers/employee.controller.js"
+import { getEmployees, getEmployeeById, createEmployee, updateEmployee, deactivateEmployee, activateEmployee, permanentDelete, getMyQRSecret, importEmployees } from "../controllers/employee.controller.js"
 import { authMiddleware, roleMiddleware } from "../middlewares/auth.middleware.js"
 
 const router = Router()
 
 router.get("/my-qr", authMiddleware, getMyQRSecret)
+router.post("/import", authMiddleware, roleMiddleware("admin", "hr"), importEmployees)
 router.get("/",     authMiddleware, getEmployees)
 router.get("/:id",  authMiddleware, getEmployeeById)
 router.post("/",    authMiddleware, roleMiddleware("admin", "hr"), createEmployee)

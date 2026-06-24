@@ -8,12 +8,12 @@ import { Topbar } from "@/components/hrm/topbar"
 import { UserTable } from "@/components/hrm/user-table"
 
 export default function Page() {
-  const { user, isLoading } = useAuth()
+  const { user, isLoading, hasPermission } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (!isLoading && user && user.role !== "admin") router.replace("/")
-  }, [user, isLoading])
+    if (!isLoading && user && !hasPermission("/users")) router.replace("/")
+  }, [user, isLoading, hasPermission])
 
   if (isLoading || !user) return null
 

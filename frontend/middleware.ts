@@ -8,7 +8,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   "/reports":     ["admin", "hr", "manager"],
   "/attendance":  ["admin", "hr", "manager", "employee"],
   "/leave":       ["admin", "hr", "manager", "employee"],
-  "/users":       ["admin"],
+  "/users":       ["admin", "hr", "manager"],
   "/":            ["admin", "hr", "manager", "employee"],
 }
 

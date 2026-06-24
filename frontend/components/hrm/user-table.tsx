@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, X, Loader2, KeyRound, ToggleLeft, ToggleRight, Pencil, Smartphone } from "lucide-react"
+import { Plus, X, Loader2, KeyRound, ToggleLeft, ToggleRight, Pencil, Smartphone, Building2, Search } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { userService } from "@/services/user"
 import { employeeService } from "@/services/employee"
+import { departmentService } from "@/services/department"
 
 type User = {
   id: number
@@ -17,6 +18,9 @@ type User = {
   full_name: string | null
   employee_code: string | null
   last_login_at: string | null
+  employee_id?: number | null
+  department_id?: number | null
+  department_name?: string | null
 }
 
 const roleLabel: Record<string, string> = {
@@ -36,6 +40,15 @@ const roleStyles: Record<string, string> = {
 export function UserTable() {
   const [users, setUsers] = useState<User[]>([])
   const [employees, setEmployees] = useState<any[]>([])
+  const [departments, setDepartments] = useState<{ id: number; name: string; manager_id?: number }[]>([])
+  const [search, setSearch] = useState("")
+  const [filterDept, setFilterDept] = useState("")
+  const [filterManagerOnly, setFilterManagerOnly] = useState(false)
+
+  const managerEmployeeIds = new Set(
+    departments.map((d: any) => d.manager_id).filter(Boolean)
+  )
+
   const [loading, setLoading] = useState(true)
   const [editUser, setEditUser] = useState<User | null>(null)
   const [showAdd, setShowAdd] = useState(false)
@@ -48,6 +61,7 @@ export function UserTable() {
   useEffect(() => {
     fetchUsers()
     employeeService.getAll().then(res => setEmployees(res.data)).catch(() => {})
+    departmentService.getAll().then(res => setDepartments(res.data)).catch(() => {})
   }, [])
 
   const fetchUsers = async () => {
@@ -115,6 +129,25 @@ export function UserTable() {
     }
   }
 
+  const handleResetDeviceByDepartment = async () => {
+    const deptOptions = departments.map(d => `${d.id}: ${d.name}`).join("\n")
+    const input = prompt(`Nhập ID phòng ban cần reset toàn bộ thiết bị:\n${deptOptions}`)
+    if (!input) return
+    const deptId = Number(input)
+    if (!deptId) {
+      alert("ID phòng ban không hợp lệ")
+      return
+    }
+    const dept = departments.find(d => d.id === deptId)
+    if (!confirm(`Reset thiết bị cho TẤT CẢ nhân viên phòng "${dept?.name || deptId}"? Hành động này ảnh hưởng nhiều người, hãy chắc chắn trước khi tiếp tục.`)) return
+    try {
+      const res = await employeeService.resetDeviceByDepartment(deptId)
+      alert(res.data.message || "Đã reset thiết bị toàn phòng!")
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Lỗi khi reset thiết bị toàn phòng")
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -123,17 +156,62 @@ export function UserTable() {
     )
   }
 
+  const filteredUsers = users.filter(u => {
+    const q = search.toLowerCase()
+    const matchSearch =
+      u.username?.toLowerCase().includes(q) ||
+      u.email?.toLowerCase().includes(q) ||
+      u.full_name?.toLowerCase().includes(q) ||
+      u.employee_code?.toLowerCase().includes(q)
+
+    const matchDept = filterDept ? u.department_id === Number(filterDept) : true
+    const matchManager = filterManagerOnly ? managerEmployeeIds.has(u.employee_id) : true
+
+    return matchSearch && matchDept && matchManager
+  })
+
   return (
     <>
       <Card className="overflow-hidden p-0">
-        <div className="flex items-center justify-between border-b border-border p-5">
+        <div className="flex flex-col gap-4 border-b border-border p-5 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-base font-semibold">Danh sách tài khoản</h2>
             <p className="text-sm text-muted-foreground">Tổng cộng {users.length} tài khoản</p>
           </div>
-          <Button size="sm" className="gap-2" onClick={() => setShowAdd(true)}>
-            <Plus className="h-4 w-4" />Tạo tài khoản
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="search"
+                placeholder="Tìm username/email/tên..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="h-9 w-56 rounded-md border border-input bg-background pl-9 pr-3 text-sm outline-none ring-ring/40 focus:ring-2"
+              />
+            </div>
+            <select
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none"
+              value={filterDept}
+              onChange={e => setFilterDept(e.target.value)}
+            >
+              <option value="">-- Tất cả phòng ban --</option>
+              {departments.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+            <Button
+              variant={filterManagerOnly ? "default" : "outline"}
+              size="sm"
+              className="gap-2"
+              onClick={() => setFilterManagerOnly(!filterManagerOnly)}
+            >
+              Chỉ trưởng phòng
+            </Button>
+            <Button variant="outline" size="sm" className="gap-2" onClick={handleResetDeviceByDepartment}>
+              <Building2 className="h-4 w-4" />Reset thiết bị cả phòng
+            </Button>
+            <Button size="sm" className="gap-2" onClick={() => setShowAdd(true)}>
+              <Plus className="h-4 w-4" />Tạo tài khoản
+            </Button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -149,7 +227,7 @@ export function UserTable() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {users.map(u => (
+              {filteredUsers.map(u => (
                 <tr key={u.id} className="hover:bg-muted/40">
                   <td className="px-5 py-4">
                     <div className="flex flex-col leading-tight">
@@ -189,10 +267,14 @@ export function UserTable() {
                         <KeyRound className="h-4 w-4" />
                       </button>
                       <button type="button" onClick={async () => {
+                        if (!u.employee_id) {
+                          alert("Tài khoản này chưa gắn với nhân viên, không thể reset theo cách này")
+                          return
+                        }
                         if (confirm(`Reset thiết bị cho ${u.username}?`)) {
                           try {
-                            await userService.resetDevice(u.id)
-                            alert("Đã reset thiết bị!")
+                            const res = await userService.resetDeviceByEmployee(u.employee_id)
+                            alert(res.data.message || "Đã reset thiết bị!")
                           } catch (err: any) {
                             alert(err.response?.data?.message || "Lỗi")
                           }
@@ -212,7 +294,6 @@ export function UserTable() {
         </div>
       </Card>
 
-      {/* Modal Sửa role */}
       {editUser && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50">
           <div className="flex min-h-full items-center justify-center p-4">
@@ -243,7 +324,6 @@ export function UserTable() {
         </div>
       )}
 
-      {/* Modal Reset mật khẩu */}
       {resetModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50">
           <div className="flex min-h-full items-center justify-center p-4">
@@ -272,7 +352,6 @@ export function UserTable() {
         </div>
       )}
 
-      {/* Modal Tạo tài khoản */}
       {showAdd && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50">
           <div className="flex min-h-full items-center justify-center p-4">

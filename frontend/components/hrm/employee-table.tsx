@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Eye, Pencil, Trash2, Search, Download, X, Plus, Loader2, AlertTriangle } from "lucide-react"
+import { Eye, Pencil, Trash2, Search, Download, X, Plus, Loader2, AlertTriangle, Upload, FileSpreadsheet } from "lucide-react"
+import * as XLSX from "xlsx"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -66,6 +67,8 @@ export function EmployeeTable() {
     employee_code: "", full_name: "", email: "", phone: "",
     department_id: "", position_id: "", hire_date: "", gender: "Nam", birth_date: "", address: ""
   })
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<{ successCount: number; totalRows: number; errors: string[] } | null>(null)
 
   useEffect(() => {
     fetchEmployees()
@@ -189,6 +192,60 @@ export function EmployeeTable() {
     }
   }
 
+  const handleDownloadTemplate = () => {
+    const sampleData = [
+      {
+        "Họ và tên": "Nguyen Van Mau",
+        "Email": "mau.nguyen@hrm.com",
+        "Ngày vào làm": "2026-01-15",
+        "Phòng ban": departments[0]?.name || "Ky thuat",
+        "Chức vụ": "",
+        "Số điện thoại": "0901234567",
+        "Ngày sinh": "1998-05-20",
+        "Giới tính": "Nam",
+        "CCCD": "",
+        "Địa chỉ": "",
+      },
+    ]
+    const ws = XLSX.utils.json_to_sheet(sampleData)
+    ws["!cols"] = [
+      { wch: 20 }, { wch: 25 }, { wch: 14 }, { wch: 18 }, { wch: 16 },
+      { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 14 }, { wch: 25 },
+    ]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Mau_NhanVien")
+    XLSX.writeFile(wb, "Mau_Import_Nhan_Vien.xlsx")
+  }
+
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      setImporting(true)
+      setImportResult(null)
+
+      const buffer = await file.arrayBuffer()
+      const wb = XLSX.read(buffer, { type: "array" })
+      const sheet = wb.Sheets[wb.SheetNames[0]]
+      const jsonData = XLSX.utils.sheet_to_json(sheet)
+
+      if (jsonData.length === 0) {
+        alert("File Excel không có dữ liệu")
+        return
+      }
+
+      const res = await employeeService.importEmployees(jsonData)
+      setImportResult(res.data)
+      fetchEmployees()
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Lỗi khi đọc hoặc nhập file Excel")
+    } finally {
+      setImporting(false)
+      e.target.value = ""
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -223,9 +280,19 @@ export function EmployeeTable() {
               <Download className="h-4 w-4" />Xuất file
             </Button>
             {canEdit && (
-              <Button size="sm" className="gap-2" onClick={() => setShowAdd(true)}>
-                <Plus className="h-4 w-4" />Thêm mới
-              </Button>
+              <>
+                <Button variant="outline" size="sm" className="gap-2" onClick={handleDownloadTemplate}>
+                  <FileSpreadsheet className="h-4 w-4" />Tải file mẫu
+                </Button>
+                <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-muted">
+                  {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  Nhập từ Excel
+                  <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileImport} disabled={importing} />
+                </label>
+                <Button size="sm" className="gap-2" onClick={() => setShowAdd(true)}>
+                  <Plus className="h-4 w-4" />Thêm mới
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -571,6 +638,33 @@ export function EmployeeTable() {
                 <Button variant="outline" className="flex-1" onClick={() => setPermanentDeleteEmployee(null)}>Hủy</Button>
                 <Button variant="destructive" className="flex-1" onClick={handlePermanentDelete}>Xóa vĩnh viễn</Button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {importResult && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="w-full max-w-lg rounded-lg bg-background p-6 shadow-lg">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Kết quả nhập Excel</h3>
+                <button onClick={() => setImportResult(null)}><X className="h-5 w-5" /></button>
+              </div>
+              <div className="rounded-md bg-emerald-50 p-3 mb-3">
+                <p className="text-sm font-medium text-emerald-700">
+                  Nhập thành công {importResult.successCount}/{importResult.totalRows} dòng
+                </p>
+              </div>
+              {importResult.errors.length > 0 && (
+                <div className="rounded-md bg-rose-50 p-3 max-h-60 overflow-y-auto">
+                  <p className="text-sm font-medium text-rose-700 mb-2">{importResult.errors.length} dòng bị lỗi:</p>
+                  <ul className="text-sm text-rose-600 flex flex-col gap-1">
+                    {importResult.errors.map((err, i) => <li key={i}>• {err}</li>)}
+                  </ul>
+                </div>
+              )}
+              <Button className="w-full mt-4" onClick={() => setImportResult(null)}>Đóng</Button>
             </div>
           </div>
         </div>

@@ -35,7 +35,7 @@ const PAGE_PERMISSIONS: Record<string, UserRole[]> = {
   "/leave":       ["admin", "hr", "manager", "employee"],
   "/contracts":   ["admin", "hr", "manager"],
   "/reports":     ["admin", "hr", "manager"],
-  "/users":       ["admin"],
+  "/users":       ["admin", "hr", "manager"],
   "/profile":     ["admin", "hr", "manager", "employee"],
   "/profile-requests": ["admin", "hr"],
 }
