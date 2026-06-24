@@ -176,8 +176,7 @@ export async function permanentDelete(req, res) {
     }
 }
 
-import * as otplib from "otplib"
-const { totp } = otplib
+import { generate as generateTotp } from "../utils/totp.js"
 
 export async function getMyQRSecret(req, res) {
   try {
@@ -185,9 +184,8 @@ export async function getMyQRSecret(req, res) {
     const [rows] = await pool.execute("SELECT employee_code FROM employees WHERE id = ?", [req.user.employee_id])
     if (rows.length === 0) return res.status(404).json({ message: "Không tìm thấy nhân viên" })
 
-    totp.options = { step: 30, digits: 6 }
     const secret = process.env.QR_SECRET_KEY + rows[0].employee_code
-    const code = totp.generate(secret)
+    const code = generateTotp(secret)
 
     return res.json({
       employee_code: rows[0].employee_code,

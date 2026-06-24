@@ -93,7 +93,8 @@ export default function SettingsPage() {
             <p className="text-sm text-muted-foreground">Vị trí công ty và bảo mật thiết bị</p>
           </div>
 
-          <Card className="p-6 max-w-md">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card className="p-6">
             <h3 className="text-sm font-semibold mb-3">Vị trí công ty</h3>
             <Button
               variant="outline"
@@ -141,7 +142,7 @@ export default function SettingsPage() {
             </Button>
           </Card>
 
-          <Card className="p-6 max-w-md mt-4">
+          <Card className="p-6">
             <div className="flex items-center gap-2 mb-1">
               {deviceLockEnabled ? <Lock className="h-4 w-4 text-emerald-600" /> : <Unlock className="h-4 w-4 text-muted-foreground" />}
               <h3 className="text-sm font-semibold">Khóa thiết bị (Device Lock)</h3>
@@ -168,6 +169,7 @@ export default function SettingsPage() {
               {deviceLockEnabled ? "Đang bật" : "Đang tắt"}
             </span>
           </Card>
+          </div>
         </main>
       </div>
     </div>

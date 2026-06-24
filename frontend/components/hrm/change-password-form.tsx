@@ -38,7 +38,7 @@ export function ChangePasswordForm() {
   }
 
   return (
-    <div className="flex flex-col gap-3 max-w-sm">
+    <div className="flex flex-col gap-3">
       <div>
         <label className="text-sm text-muted-foreground">Mật khẩu hiện tại</label>
         <input type={showPw ? "text" : "password"}

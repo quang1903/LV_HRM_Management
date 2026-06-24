@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@otplib/plugin-crypto-node": "^13.4.1"
+  }
+}

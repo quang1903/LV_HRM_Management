@@ -9,23 +9,28 @@ import { Card } from "@/components/ui/card"
 
 export default function ProfilePage() {
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
+    <div className="flex min-h-screen bg-muted/40">
       <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />
-        <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto">
-          <h1 className="text-2xl font-bold text-slate-900 mb-6">Trang cá nhân</h1>
+        <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold">Trang cá nhân</h2>
+            <p className="text-sm text-muted-foreground">Xem và cập nhật thông tin của bạn</p>
+          </div>
 
           <div className="flex flex-col gap-4">
             <MyProfileInfo />
 
-            <Card className="p-6 max-w-2xl">
+            <Card className="p-6">
               <h3 className="font-semibold mb-4">Đổi mật khẩu</h3>
               <ChangePasswordForm />
             </Card>
 
-            <div className="flex flex-col lg:flex-row gap-4">
-              <MyQRCode />
+            <div className="flex justify-center">
+              <div className="w-full max-w-sm">
+                <MyQRCode />
+              </div>
             </div>
           </div>
         </main>

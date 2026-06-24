@@ -1,6 +1,5 @@
 import pool from "../config/db.js"
-import * as otplib from "otplib"
-const { totp } = otplib
+import { verify as verifyTotp } from "../utils/totp.js"
 import dotenv from "dotenv"
 dotenv.config()
 
@@ -127,9 +126,8 @@ export async function checkIn(req, res) {
     const [employee_code, otp] = qr_value.split(":")
     if (!employee_code || !otp) return res.status(400).json({ message: "Mã QR sai định dạng" })
 
-    totp.options = { step: 30, digits: 6 }
     const secret = process.env.QR_SECRET_KEY + employee_code
-    const isValid = totp.check(otp, secret)
+    const isValid = verifyTotp(otp, secret)
     if (!isValid) return res.status(400).json({ message: "Mã QR đã hết hạn, vui lòng quét lại" })
 
     const [employees] = await pool.execute(
@@ -169,9 +167,8 @@ export async function checkOut(req, res) {
     const [employee_code, otp] = qr_value.split(":")
     if (!employee_code || !otp) return res.status(400).json({ message: "Mã QR sai định dạng" })
 
-    totp.options = { step: 30, digits: 6 }
     const secret = process.env.QR_SECRET_KEY + employee_code
-    const isValid = totp.check(otp, secret)
+    const isValid = verifyTotp(otp, secret)
     if (!isValid) return res.status(400).json({ message: "Mã QR đã hết hạn, vui lòng quét lại" })
 
     const [employees] = await pool.execute(

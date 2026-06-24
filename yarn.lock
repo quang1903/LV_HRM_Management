@@ -2,3 +2,14 @@
 # yarn lockfile v1
 
 
+"@otplib/core@13.4.1":
+  version "13.4.1"
+  resolved "https://registry.yarnpkg.com/@otplib/core/-/core-13.4.1.tgz#9be8d21b5eacf2c23ae8156e870cf65e9e0e3d5e"
+  integrity sha512-KIXgK1hNtWJEBMTastbe1bpmuais+3f+ATeO8TkMs2rNkfGO1FbQy8+/UWVEu3TR/iTJerU0idkPudaPmLP2BA==
+
+"@otplib/plugin-crypto-node@^13.4.1":
+  version "13.4.1"
+  resolved "https://registry.yarnpkg.com/@otplib/plugin-crypto-node/-/plugin-crypto-node-13.4.1.tgz#87555ac9264bd53dd85e5eca93d108e6859115a4"
+  integrity sha512-ce4Y+6Al+NI8rlyVcOCrTQh/LxQamdAlJCDVTDSYnxApT2dDyK7ADsxVjuDmnh6giZ//vhgMipu1S9NBt7aEzQ==
+  dependencies:
+    "@otplib/core" "13.4.1"

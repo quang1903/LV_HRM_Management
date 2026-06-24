@@ -87,7 +87,7 @@ export function MyProfileInfo() {
   const pendingFields = new Set(myRequests.filter(r => r.status === "Cho duyet").map(r => r.field_name))
 
   return (
-    <Card className="p-6 max-w-2xl">
+    <Card className="p-6">
       <div className="flex items-center gap-4 mb-6">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-xl font-semibold text-primary">
           {getInitials(employee.full_name)}
