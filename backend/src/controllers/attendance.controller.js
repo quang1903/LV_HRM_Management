@@ -1,5 +1,6 @@
 import pool from "../config/db.js"
-import { totp } from "otplib"
+import * as otplib from "otplib"
+const { totp } = otplib
 import dotenv from "dotenv"
 dotenv.config()
 

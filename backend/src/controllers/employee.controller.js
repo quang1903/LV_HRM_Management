@@ -167,7 +167,8 @@ export async function permanentDelete(req, res) {
     }
 }
 
-import { totp } from "otplib"
+import * as otplib from "otplib"
+const { totp } = otplib
 
 export async function getMyQRSecret(req, res) {
   try {
