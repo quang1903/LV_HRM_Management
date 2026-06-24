@@ -236,6 +236,7 @@ export async function importEmployees(req, res) {
         const genderRaw = (row["Giới tính"] || "").toString().trim()
         const id_card = (row["CCCD"] || "").toString().trim() || null
         const address = (row["Địa chỉ"] || "").toString().trim() || null
+        const roleRaw = (row["Vai trò"] || "").toString().trim().toLowerCase()
 
         if (!full_name || !email || !hire_date_raw) {
           errors.push(`Dòng ${rowNumber}: Thiếu Họ tên, Email hoặc Ngày vào làm`)
@@ -290,6 +291,16 @@ export async function importEmployees(req, res) {
           else gender = "Khac"
         }
 
+        const validRoles = ["admin", "hr", "manager", "employee"]
+        let userRole = "employee"
+        if (roleRaw) {
+          if (validRoles.includes(roleRaw)) {
+            userRole = roleRaw
+          } else {
+            errors.push(`Dòng ${rowNumber}: Vai trò "${row["Vai trò"]}" không hợp lệ (chỉ nhận admin/hr/manager/employee), đã dùng mặc định employee`)
+          }
+        }
+
         maxCode += 1
         const employee_code = `EMP${String(maxCode).padStart(3, "0")}`
 
@@ -312,8 +323,8 @@ export async function importEmployees(req, res) {
         const hashed = await bcrypt.hash("123456", 10)
         await pool.execute(`
           INSERT INTO users (username, email, password, role, employee_id, is_active)
-          VALUES (?, ?, ?, 'employee', ?, 1)
-        `, [username, email, hashed, employeeId])
+          VALUES (?, ?, ?, ?, ?, 1)
+        `, [username, email, hashed, userRole, employeeId])
 
         successCount++
       } catch (rowErr) {

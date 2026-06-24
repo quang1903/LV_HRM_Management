@@ -31,6 +31,25 @@ Dưới đây là tóm tắt những hạng mục chúng ta đã hoàn thành v�
 ### 5. Khôi phục logic Timezone (Múi giờ Việt Nam) cho Chấm công
 - **Vấn đề:** Bị lỗi lưu sai ngày giờ (bị lùi ngày) hoặc tính sai trạng thái "Đi trễ/Đúng giờ" do mã nguồn vô tình bị rollback về lấy giờ UTC chuẩn (`new Date().toISOString()`).
 - **Khắc phục:** Đã tích hợp hàm `getVietnamTime()` trong file `attendance.controller.js`. Áp dụng lấy đúng giờ Việt Nam cho cả luồng Quét mã QR (`checkIn`) và Chấm công định vị GPS (`selfCheckIn`).
+
+### 6. Viết lại lõi tạo TOTP (Mã QR Xoay vòng)
+- **Vấn đề:** Gặp hàng loạt lỗi tương thích và syntax với thư viện `otplib` (module export lỗi, thiếu plugin crypto trên Node.js).
+- **Khắc phục:** Loại bỏ hoàn toàn sự phụ thuộc vào `otplib`. Đã tự viết lại toàn bộ logic sinh mã và xác thực TOTP dựa trên module `crypto` gốc của Node.js vào file `backend/src/utils/totp.js` (chuẩn 30 giây, 6 số).
+- **Áp dụng:** Cập nhật `employee.controller.js` và `attendance.controller.js` để dùng bộ công cụ TOTP custom. Test thành công 100%.
+
+### 7. Tối ưu UX/UI (Trang Profile & Settings)
+- **Cải tiến UX Mã QR:** Trang cá nhân (MyQRCode) giờ tự động dừng khi đếm về 0, làm mờ ảnh QR và hiện nút "Tạo mã mới" thay vì load API vô tội vạ.
+- **Đồng bộ Layout Trang Cài đặt:** Xóa các giới hạn `max-w-md` cứng nhắc, chuyển sang cấu trúc `grid-cols-2` hiển thị full màn hình cực kỳ thoáng đãng.
+- **Đồng bộ Layout Trang Cá nhân:**
+  - Quy hoạch lại thành 1 cột duy nhất theo thứ tự: Thông tin cá nhân -> Đổi mật khẩu -> Mã QR (căn giữa).
+  - Loại bỏ các class `max-w-2xl` và `max-w-sm` bó buộc form, giúp nội dung tự động mở rộng (full-width) vừa khớp với thẻ Card bao ngoài rất đẹp.
+
+### 8. Nâng cấp tính năng Import Excel
+- **Bổ sung cột "Vai trò":** 
+  - Hỗ trợ nhập trực tiếp phân quyền (admin, hr, manager, employee) ngay từ file Excel `Mau_Import_Nhan_Vien.xlsx` (cột thứ 11).
+  - Tự động validate dữ liệu, nếu nhập sai vai trò sẽ tự động fallback về `employee` kèm log cảnh báo chi tiết, chống lỗi cấp quyền bừa bãi.
+  - Sửa backend (`employee.controller.js`) tự động insert vào bảng `users` với đúng role tương ứng.
+
 ---
 
 ## ⏳ NHỮNG GÌ CHƯA LÀM (HOẶC CẦN KIỂMẾ TIẾP)

@@ -205,12 +205,13 @@ export function EmployeeTable() {
         "Giới tính": "Nam",
         "CCCD": "",
         "Địa chỉ": "",
+        "Vai trò": "employee",
       },
     ]
     const ws = XLSX.utils.json_to_sheet(sampleData)
     ws["!cols"] = [
       { wch: 20 }, { wch: 25 }, { wch: 14 }, { wch: 18 }, { wch: 16 },
-      { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 14 }, { wch: 25 },
+      { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 14 }, { wch: 25 }, { wch: 12 },
     ]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, "Mau_NhanVien")
