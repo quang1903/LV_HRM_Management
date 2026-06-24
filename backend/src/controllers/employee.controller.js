@@ -5,13 +5,22 @@ dotenv.config()
 
 export async function getEmployees(req, res) {
     try {
-        const [rows] = await pool.execute(`
+        let query = `
       SELECT e.*, d.name as department_name, p.name as position_name
       FROM employees e
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN positions p ON e.position_id = p.id
-      ORDER BY e.created_at DESC
-    `)
+    `
+        const params = []
+
+        // Manager chỉ thấy nhân viên thuộc phòng ban mình quản lý
+        if (req.user.role === "manager") {
+            query += ` WHERE e.department_id IN (SELECT id FROM departments WHERE manager_id = ?) `
+            params.push(req.user.employee_id)
+        }
+
+        query += " ORDER BY e.created_at DESC"
+        const [rows] = await pool.execute(query, params)
 
         if (req.user.role === "employee") {
             rows.forEach(row => {

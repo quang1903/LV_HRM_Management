@@ -5,7 +5,7 @@ dotenv.config()
 
 export async function getUsers(req, res) {
   try {
-    const [rows] = await pool.execute(`
+    let query = `
       SELECT u.id, u.username, u.email, u.role, u.is_active, u.last_login_at, u.created_at,
              u.employee_id,
              e.full_name, e.employee_code, e.department_id,
@@ -13,8 +13,21 @@ export async function getUsers(req, res) {
       FROM users u
       LEFT JOIN employees e ON u.employee_id = e.id
       LEFT JOIN departments d ON e.department_id = d.id
-      ORDER BY u.created_at DESC
-    `)
+    `
+    const params = []
+
+    // Manager chỉ thấy user thuộc phòng ban mình quản lý
+    if (req.user.role === "manager") {
+      query += `
+        WHERE e.department_id IN (
+          SELECT id FROM departments WHERE manager_id = ?
+        )
+      `
+      params.push(req.user.employee_id)
+    }
+
+    query += " ORDER BY u.created_at DESC"
+    const [rows] = await pool.execute(query, params)
     return res.json(rows)
   } catch (err) {
     console.error(err)
