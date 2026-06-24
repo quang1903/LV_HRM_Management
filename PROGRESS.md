@@ -27,6 +27,10 @@ Dưới đây là tóm tắt những hạng mục chúng ta đã hoàn thành v�
   - Sửa API `getUsers` (`user.controller.js`): Manager chỉ thấy danh sách tài khoản thuộc phòng ban mình quản lý.
   - Sửa API `getEmployees` (`employee.controller.js`): Manager chỉ thấy danh sách nhân viên thuộc phòng ban mình quản lý.
 - **Tính đồng bộ:** Vì API `getEmployees` được dùng chung ở nhiều component (trang Danh sách nhân viên và Dashboard), việc lọc dữ liệu ở backend giúp giải quyết tự động cho tất cả các trang Frontend mà không lo rò rỉ dữ liệu qua DevTools.
+
+### 5. Khôi phục logic Timezone (Múi giờ Việt Nam) cho Chấm công
+- **Vấn đề:** Bị lỗi lưu sai ngày giờ (bị lùi ngày) hoặc tính sai trạng thái "Đi trễ/Đúng giờ" do mã nguồn vô tình bị rollback về lấy giờ UTC chuẩn (`new Date().toISOString()`).
+- **Khắc phục:** Đã tích hợp hàm `getVietnamTime()` trong file `attendance.controller.js`. Áp dụng lấy đúng giờ Việt Nam cho cả luồng Quét mã QR (`checkIn`) và Chấm công định vị GPS (`selfCheckIn`).
 ---
 
 ## ⏳ NHỮNG GÌ CHƯA LÀM (HOẶC CẦN KIỂMẾ TIẾP)
