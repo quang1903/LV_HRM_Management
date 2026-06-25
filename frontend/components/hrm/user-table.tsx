@@ -21,6 +21,7 @@ type User = {
   employee_id?: number | null
   department_id?: number | null
   department_name?: string | null
+  managing_department_name?: string | null
 }
 
 const roleLabel: Record<string, string> = {
@@ -247,6 +248,11 @@ export function UserTable() {
                     <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", roleStyles[u.role])}>
                       {roleLabel[u.role] || u.role}
                     </span>
+                    {u.role === "manager" && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {u.managing_department_name ? `QL: ${u.managing_department_name}` : "Chưa quản lý phòng"}
+                      </p>
+                    )}
                   </td>
                   <td className="px-5 py-4">
                     <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset",

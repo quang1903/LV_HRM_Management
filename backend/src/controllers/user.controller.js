@@ -9,10 +9,12 @@ export async function getUsers(req, res) {
       SELECT u.id, u.username, u.email, u.role, u.is_active, u.last_login_at, u.created_at,
              u.employee_id,
              e.full_name, e.employee_code, e.department_id,
-             d.name as department_name
+             d.name as department_name,
+             dm.name as managing_department_name
       FROM users u
       LEFT JOIN employees e ON u.employee_id = e.id
       LEFT JOIN departments d ON e.department_id = d.id
+      LEFT JOIN departments dm ON dm.manager_id = e.id
     `
     const params = []
 
@@ -66,7 +68,7 @@ export async function createUser(req, res) {
 export async function updateUser(req, res) {
   try {
     const { role, employee_id } = req.body
-    const [existing] = await pool.execute("SELECT id FROM users WHERE id = ?", [req.params.id])
+    const [existing] = await pool.execute("SELECT id, role, employee_id FROM users WHERE id = ?", [req.params.id])
     if (existing.length === 0) return res.status(404).json({ message: "Không tìm thấy tài khoản" })
 
     if (employee_id) {
@@ -74,11 +76,27 @@ export async function updateUser(req, res) {
       if (dupEmp.length > 0) return res.status(400).json({ message: "Nhân viên này đã có tài khoản khác" })
     }
 
+    const oldUser = existing[0]
+    let warningMessage = ""
+
+    // Nếu đang hạ role từ manager xuống role khác, kiểm tra và xóa Trưởng phòng nếu có
+    if (oldUser.role === "manager" && role !== "manager" && oldUser.employee_id) {
+      const [deptRows] = await pool.execute(
+        "SELECT id, name FROM departments WHERE manager_id = ?",
+        [oldUser.employee_id]
+      )
+      if (deptRows.length > 0) {
+        await pool.execute("UPDATE departments SET manager_id = NULL WHERE manager_id = ?", [oldUser.employee_id])
+        const deptNames = deptRows.map(d => d.name).join(", ")
+        warningMessage = ` (Đã tự động bỏ chức Trưởng phòng tại: ${deptNames})`
+      }
+    }
+
     await pool.execute(
       "UPDATE users SET role = ?, employee_id = ? WHERE id = ?",
       [role, employee_id || null, req.params.id]
     )
-    return res.json({ message: "Cập nhật thành công" })
+    return res.json({ message: `Cập nhật thành công${warningMessage}` })
   } catch (err) {
     console.error(err)
     return res.status(500).json({ message: "Lỗi server" })

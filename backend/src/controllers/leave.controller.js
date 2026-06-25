@@ -5,7 +5,7 @@ dotenv.config()
 export async function getLeaves(req, res) {
   try {
     let query = `
-      SELECT l.*, e.full_name, e.employee_code, d.name as department_name
+      SELECT l.*, e.full_name, e.employee_code, e.department_id, d.name as department_name
       FROM leave_requests l
       LEFT JOIN employees e ON l.employee_id = e.id
       LEFT JOIN departments d ON e.department_id = d.id
@@ -16,6 +16,12 @@ export async function getLeaves(req, res) {
     if (req.user.role === "employee") {
       query += " WHERE l.employee_id = (SELECT employee_id FROM users WHERE id = ?)"
       params.push(req.user.id)
+    }
+
+    // Manager chỉ xem đơn của nhân viên thuộc phòng ban mình quản lý
+    if (req.user.role === "manager") {
+      query += " WHERE e.department_id IN (SELECT id FROM departments WHERE manager_id = ?)"
+      params.push(req.user.employee_id)
     }
 
     query += " ORDER BY l.created_at DESC"
@@ -74,9 +80,27 @@ export async function createLeave(req, res) {
 
 export async function approveLeave(req, res) {
   try {
-    const [existing] = await pool.execute("SELECT id, status FROM leave_requests WHERE id = ?", [req.params.id])
+    const [existing] = await pool.execute(
+      `SELECT l.id, l.status, e.department_id
+       FROM leave_requests l
+       LEFT JOIN employees e ON l.employee_id = e.id
+       WHERE l.id = ?`,
+      [req.params.id]
+    )
     if (existing.length === 0) return res.status(404).json({ message: "Không tìm thấy đơn" })
     if (existing[0].status !== 'Cho duyet') return res.status(400).json({ message: "Đơn đã được xử lý" })
+
+    // Manager chỉ được duyệt đơn của nhân viên thuộc phòng ban mình quản lý
+    if (req.user.role === "manager") {
+      const [dept] = await pool.execute(
+        "SELECT id FROM departments WHERE id = ? AND manager_id = ?",
+        [existing[0].department_id, req.user.employee_id]
+      )
+      if (dept.length === 0) {
+        return res.status(403).json({ message: "Bạn chỉ được duyệt đơn của nhân viên thuộc phòng ban mình quản lý" })
+      }
+    }
+
     await pool.execute(
       "UPDATE leave_requests SET status='Da duyet', approved_by=?, approved_at=NOW() WHERE id=?",
       [req.user.id, req.params.id]
@@ -91,9 +115,28 @@ export async function rejectLeave(req, res) {
   try {
     const { reject_reason } = req.body
     if (!reject_reason) return res.status(400).json({ message: "Vui lòng nhập lý do từ chối" })
-    const [existing] = await pool.execute("SELECT id, status FROM leave_requests WHERE id = ?", [req.params.id])
+
+    const [existing] = await pool.execute(
+      `SELECT l.id, l.status, e.department_id
+       FROM leave_requests l
+       LEFT JOIN employees e ON l.employee_id = e.id
+       WHERE l.id = ?`,
+      [req.params.id]
+    )
     if (existing.length === 0) return res.status(404).json({ message: "Không tìm thấy đơn" })
     if (existing[0].status !== 'Cho duyet') return res.status(400).json({ message: "Đơn đã được xử lý" })
+
+    // Manager chỉ được từ chối đơn của nhân viên thuộc phòng ban mình quản lý
+    if (req.user.role === "manager") {
+      const [dept] = await pool.execute(
+        "SELECT id FROM departments WHERE id = ? AND manager_id = ?",
+        [existing[0].department_id, req.user.employee_id]
+      )
+      if (dept.length === 0) {
+        return res.status(403).json({ message: "Bạn chỉ được từ chối đơn của nhân viên thuộc phòng ban mình quản lý" })
+      }
+    }
+
     await pool.execute(
       "UPDATE leave_requests SET status='Tu choi', reject_reason=?, approved_by=?, approved_at=NOW() WHERE id=?",
       [reject_reason, req.user.id, req.params.id]

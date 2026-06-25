@@ -48,14 +48,52 @@ export async function createDepartment(req, res) {
 export async function updateDepartment(req, res) {
   try {
     const { name, description, manager_id } = req.body
-    const [existing] = await pool.execute("SELECT id FROM departments WHERE id = ?", [req.params.id])
+    const [existing] = await pool.execute("SELECT id, manager_id FROM departments WHERE id = ?", [req.params.id])
     if (existing.length === 0) return res.status(404).json({ message: "Không tìm thấy phòng ban" })
+
+    const oldManagerId = existing[0].manager_id
+    const newManagerId = manager_id || null
+    let warningMessage = ""
+
+    // Nếu có gán Trưởng phòng mới và khác với người cũ
+    if (newManagerId && newManagerId !== oldManagerId) {
+      // Nâng role người mới lên manager (nếu role hiện tại thấp hơn admin)
+      const [newManagerUser] = await pool.execute(
+        "SELECT id, role FROM users WHERE employee_id = ?",
+        [newManagerId]
+      )
+      if (newManagerUser.length > 0 && newManagerUser[0].role !== "admin" && newManagerUser[0].role !== "manager") {
+        await pool.execute("UPDATE users SET role = 'manager' WHERE employee_id = ?", [newManagerId])
+        warningMessage += " Đã tự động nâng quyền tài khoản Trưởng phòng mới lên Quản lý."
+      }
+    }
+
+    // Nếu đổi qua người khác (có Trưởng phòng cũ và khác người mới), kiểm tra hạ role người cũ
+    if (oldManagerId && oldManagerId !== newManagerId) {
+      const [otherDepts] = await pool.execute(
+        "SELECT id FROM departments WHERE manager_id = ? AND id != ?",
+        [oldManagerId, req.params.id]
+      )
+      // Người cũ không còn quản lý phòng nào khác -> hạ role nếu đang là manager
+      if (otherDepts.length === 0) {
+        const [oldManagerUser] = await pool.execute(
+          "SELECT id, role FROM users WHERE employee_id = ?",
+          [oldManagerId]
+        )
+        if (oldManagerUser.length > 0 && oldManagerUser[0].role === "manager") {
+          await pool.execute("UPDATE users SET role = 'employee' WHERE employee_id = ?", [oldManagerId])
+          warningMessage += " Đã tự động hạ quyền tài khoản Trưởng phòng cũ về Nhân viên (không còn quản lý phòng nào)."
+        }
+      }
+    }
+
     await pool.execute(
       "UPDATE departments SET name=?, description=?, manager_id=? WHERE id=?",
-      [name, description || null, manager_id || null, req.params.id]
+      [name, description || null, newManagerId, req.params.id]
     )
-    return res.json({ message: "Cập nhật phòng ban thành công" })
+    return res.json({ message: `Cập nhật phòng ban thành công.${warningMessage}` })
   } catch (err) {
+    console.error(err)
     return res.status(500).json({ message: "Lỗi server" })
   }
 }

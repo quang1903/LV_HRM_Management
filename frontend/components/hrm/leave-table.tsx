@@ -370,7 +370,16 @@ export function LeaveTable() {
                   <label className="text-sm text-muted-foreground">Từ ngày *</label>
                   <input type="date" className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 ring-ring/40"
                     value={newLeave.start_date}
-                    onChange={e => setNewLeave({ ...newLeave, start_date: e.target.value })} />
+                    onChange={e => {
+                      const start = e.target.value
+                      const end = newLeave.end_date
+                      let days = newLeave.total_days
+                      if (start && end) {
+                        const diff = Math.ceil((new Date(end).getTime() - new Date(start).getTime()) / (1000 * 60 * 60 * 24)) + 1
+                        days = diff > 0 ? diff : 1
+                      }
+                      setNewLeave({ ...newLeave, start_date: start, total_days: days })
+                    }} />
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground">Đến ngày *</label>
