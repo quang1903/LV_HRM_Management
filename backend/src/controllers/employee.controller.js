@@ -311,6 +311,30 @@ export async function importEmployees(req, res) {
 
         const employeeId = result.insertId
 
+        // Nếu Vai trò là manager: chỉ giữ role manager khi gán được làm Trưởng phòng một phòng cụ thể
+        let finalRole = userRole
+        if (userRole === "manager") {
+          if (!department_id) {
+            finalRole = "employee"
+            errors.push(`Dòng ${rowNumber}: "${full_name}" ghi Vai trò "manager" nhưng không chọn Phòng ban, đã hạ về employee`)
+          } else {
+            const [deptRows] = await pool.execute(
+              `SELECT d.manager_id, e2.full_name as current_manager_name
+               FROM departments d
+               LEFT JOIN employees e2 ON d.manager_id = e2.id
+               WHERE d.id = ?`,
+              [department_id]
+            )
+            if (deptRows.length > 0 && !deptRows[0].manager_id) {
+              await pool.execute("UPDATE departments SET manager_id = ? WHERE id = ?", [employeeId, department_id])
+            } else {
+              finalRole = "employee"
+              const currentManagerName = deptRows[0]?.current_manager_name || "không xác định"
+              errors.push(`Dòng ${rowNumber}: Phòng "${dept_name}" đã có Trưởng phòng là "${currentManagerName}", "${full_name}" đã được hạ về role employee thay vì manager`)
+            }
+          }
+        }
+
         let baseUsername = email.split("@")[0]
         let username = baseUsername
         let counter = 1
@@ -324,7 +348,7 @@ export async function importEmployees(req, res) {
         await pool.execute(`
           INSERT INTO users (username, email, password, role, employee_id, is_active)
           VALUES (?, ?, ?, ?, ?, 1)
-        `, [username, email, hashed, userRole, employeeId])
+        `, [username, email, hashed, finalRole, employeeId])
 
         successCount++
       } catch (rowErr) {
