@@ -16,6 +16,9 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   if (pathname.startsWith("/_next") || pathname.includes(".")) return NextResponse.next()
 
+  // Trang /scan là máy chấm công công khai, không yêu cầu đăng nhập
+  if (pathname === "/scan" || pathname.startsWith("/scan/")) return NextResponse.next()
+
   const userCookie = request.cookies.get("hrm_user")?.value
   if (!userCookie) {
     if (pathname === "/login") return NextResponse.next()

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Eye, Pencil, Trash2, Search, Download, X, Plus, Loader2, AlertTriangle, Upload, FileSpreadsheet } from "lucide-react"
 import * as XLSX from "xlsx"
+import { exportToExcel } from "@/lib/exportExcel"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -68,6 +69,7 @@ export function EmployeeTable() {
     department_id: "", position_id: "", hire_date: "", gender: "Nam", birth_date: "", address: ""
   })
   const [importing, setImporting] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
   const [importResult, setImportResult] = useState<{ successCount: number; totalRows: number; errors: string[] } | null>(null)
 
   useEffect(() => {
@@ -192,6 +194,27 @@ export function EmployeeTable() {
     }
   }
 
+  const handleExportFile = (data: Employee[]) => {
+    if (data.length === 0) {
+      alert("Không có dữ liệu để xuất")
+      return
+    }
+    exportToExcel(
+      data,
+      [
+        { key: "employee_code", label: "Mã NV" },
+        { key: "full_name", label: "Họ tên" },
+        { key: "email", label: "Email" },
+        { key: "phone", label: "SĐT" },
+        { key: "department_name", label: "Phòng ban" },
+        { key: "position_name", label: "Chức vụ" },
+        { key: "hire_date", label: "Ngày vào làm" },
+        { key: "status", label: "Trạng thái" },
+      ],
+      `Danh_sach_nhan_vien_${new Date().toISOString().split("T")[0]}`
+    )
+  }
+
   const handleDownloadTemplate = () => {
     const sampleData = [
       {
@@ -277,9 +300,32 @@ export function EmployeeTable() {
             <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowInactive(!showInactive)}>
               {showInactive ? "Xem đang làm" : "Xem đã nghỉ"}
             </Button>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Download className="h-4 w-4" />Xuất file
-            </Button>
+            <div className="relative">
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowExportMenu(!showExportMenu)}>
+                <Download className="h-4 w-4" />Xuất file
+              </Button>
+              {showExportMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
+                  <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-md border border-border bg-background shadow-lg py-1">
+                    <button
+                      type="button"
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                      onClick={() => { handleExportFile(filtered); setShowExportMenu(false) }}
+                    >
+                      Xuất đang hiển thị
+                    </button>
+                    <button
+                      type="button"
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                      onClick={() => { handleExportFile(employees); setShowExportMenu(false) }}
+                    >
+                      Xuất tất cả
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
             {canEdit && (
               <>
                 <Button variant="outline" size="sm" className="gap-2" onClick={handleDownloadTemplate}>
