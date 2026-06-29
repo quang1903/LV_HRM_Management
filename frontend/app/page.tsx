@@ -6,7 +6,6 @@ import { Topbar } from "@/components/hrm/topbar"
 import { StatCards } from "@/components/hrm/stat-cards"
 import { EmployeeTable } from "@/components/hrm/employee-table"
 import { ActivityPanel } from "@/components/hrm/activity-panel"
-import { CheckinButton } from "@/components/hrm/checkin-button"
 
 export default function Page() {
   const { user } = useAuth()
@@ -28,7 +27,6 @@ export default function Page() {
               </p>
             </div>
             <StatCards />
-            {user?.role === "employee" && <CheckinButton />}
             <ActivityPanel />
             {canSeeAllEmployees && <EmployeeTable />}
           </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { Html5Qrcode } from "html5-qrcode"
-import { Briefcase, CheckCircle2, XCircle, Loader2 } from "lucide-react"
+import { Briefcase, CheckCircle2, XCircle, Loader2, MapPin } from "lucide-react"
 import axios from "axios"
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api")
@@ -15,7 +15,35 @@ export default function ScanPage() {
   const lastScanRef = useRef<string>("")
   const cooldownRef = useRef(false)
 
+  const [locationStatus, setLocationStatus] = useState<"checking" | "denied" | "ok" | "error">("checking")
+  const [locationError, setLocationError] = useState("")
+  const coordsRef = useRef<{ latitude: number; longitude: number } | null>(null)
+
   useEffect(() => {
+    if (!navigator.geolocation) {
+      setLocationStatus("error")
+      setLocationError("Thiết bị không hỗ trợ định vị")
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        coordsRef.current = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        }
+        setLocationStatus("ok")
+      },
+      (error) => {
+        setLocationStatus("denied")
+        setLocationError(error.message || "Không thể lấy vị trí, vui lòng cấp quyền định vị")
+      },
+      { enableHighAccuracy: true }
+    )
+  }, [])
+
+  useEffect(() => {
+    if (locationStatus !== "ok") return
+
     const scanner = new Html5Qrcode("qr-reader")
     scannerRef.current = scanner
 
@@ -31,17 +59,19 @@ export default function ScanPage() {
     return () => {
       scanner.stop().catch(() => {})
     }
-  }, [])
+  }, [locationStatus])
 
   const onScanSuccess = async (decodedText: string) => {
     if (cooldownRef.current || decodedText === lastScanRef.current) return
+    if (!coordsRef.current) return
     lastScanRef.current = decodedText
     cooldownRef.current = true
     setTimeout(() => { cooldownRef.current = false; lastScanRef.current = "" }, 3000)
 
+    const { latitude, longitude } = coordsRef.current
+
     try {
-      // Thử check-in trước, nếu đã check-in thì tự check-out
-      const res = await axios.post(`${API_URL}/attendances/checkin`, { qr_value: decodedText })
+      const res = await axios.post(`${API_URL}/attendances/checkin`, { qr_value: decodedText, latitude, longitude })
       const time = new Date(res.data.check_in).toLocaleTimeString("vi-VN")
       setResult({ message: `Check-in lúc ${time}`, success: true, name: res.data.full_name })
       setHistory(prev => [{ name: res.data.full_name, time: `Vào ${time}` }, ...prev].slice(0, 8))
@@ -49,7 +79,7 @@ export default function ScanPage() {
       const msg = err.response?.data?.message || ""
       if (msg.includes("đã check-in")) {
         try {
-          const res2 = await axios.post(`${API_URL}/attendances/checkout`, { qr_value: decodedText })
+          const res2 = await axios.post(`${API_URL}/attendances/checkout`, { qr_value: decodedText, latitude, longitude })
           const time = new Date(res2.data.check_out).toLocaleTimeString("vi-VN")
           setResult({ message: `Check-out lúc ${time}`, success: true, name: res2.data.full_name })
           setHistory(prev => [{ name: res2.data.full_name, time: `Ra ${time}` }, ...prev].slice(0, 8))
@@ -60,6 +90,31 @@ export default function ScanPage() {
         setResult({ message: msg || "Lỗi xử lý", success: false })
       }
     }
+  }
+
+  // Chưa lấy được vị trí, hoặc bị chặn quyền định vị
+  if (locationStatus === "checking") {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="text-center text-white">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3" />
+          <p className="text-sm text-slate-300">Đang xác định vị trí thiết bị...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (locationStatus === "denied" || locationStatus === "error") {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="text-center text-white max-w-sm">
+          <MapPin className="h-10 w-10 mx-auto mb-3 text-rose-500" />
+          <h2 className="text-lg font-semibold mb-2">Không thể xác định vị trí</h2>
+          <p className="text-sm text-slate-300">{locationError}</p>
+          <p className="text-xs text-slate-400 mt-3">Vui lòng cấp quyền truy cập vị trí cho trình duyệt và tải lại trang.</p>
+        </div>
+      </div>
+    )
   }
 
   return (

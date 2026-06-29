@@ -120,8 +120,19 @@ export async function updateAttendance(req, res) {
 
 export async function checkIn(req, res) {
   try {
-    const { qr_value } = req.body
+    const { qr_value, latitude, longitude } = req.body
     if (!qr_value) return res.status(400).json({ message: "Mã QR không hợp lệ" })
+    if (!latitude || !longitude) return res.status(400).json({ message: "Thiếu vị trí GPS của thiết bị quét" })
+
+    const [settingsRows] = await pool.execute("SELECT * FROM settings WHERE id = 1")
+    if (settingsRows.length === 0) return res.status(400).json({ message: "Chưa cài đặt vị trí công ty" })
+    const companyLat = parseFloat(settingsRows[0].company_lat)
+    const companyLng = parseFloat(settingsRows[0].company_lng)
+    const maxDist = parseFloat(settingsRows[0].max_distance || 500)
+    const distance = getDistanceMeters(latitude, longitude, companyLat, companyLng)
+    if (distance > maxDist) {
+      return res.status(403).json({ message: `Thiết bị quét không ở trong khu vực công ty (${Math.round(distance)}m)` })
+    }
 
     const [employee_code, otp] = qr_value.split(":")
     if (!employee_code || !otp) return res.status(400).json({ message: "Mã QR sai định dạng" })
@@ -161,8 +172,19 @@ export async function checkIn(req, res) {
 
 export async function checkOut(req, res) {
   try {
-    const { qr_value } = req.body
+    const { qr_value, latitude, longitude } = req.body
     if (!qr_value) return res.status(400).json({ message: "Mã QR không hợp lệ" })
+    if (!latitude || !longitude) return res.status(400).json({ message: "Thiếu vị trí GPS của thiết bị quét" })
+
+    const [settingsRows] = await pool.execute("SELECT * FROM settings WHERE id = 1")
+    if (settingsRows.length === 0) return res.status(400).json({ message: "Chưa cài đặt vị trí công ty" })
+    const companyLat = parseFloat(settingsRows[0].company_lat)
+    const companyLng = parseFloat(settingsRows[0].company_lng)
+    const maxDist = parseFloat(settingsRows[0].max_distance || 500)
+    const distance = getDistanceMeters(latitude, longitude, companyLat, companyLng)
+    if (distance > maxDist) {
+      return res.status(403).json({ message: `Thiết bị quét không ở trong khu vực công ty (${Math.round(distance)}m)` })
+    }
 
     const [employee_code, otp] = qr_value.split(":")
     if (!employee_code || !otp) return res.status(400).json({ message: "Mã QR sai định dạng" })
@@ -212,87 +234,4 @@ function getDistanceMeters(lat1, lng1, lat2, lng2) {
             Math.sin(dLng/2) * Math.sin(dLng/2)
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
   return R * c
-}
-
-export async function selfCheckIn(req, res) {
-  try {
-    if (!req.user.employee_id) return res.status(400).json({ message: "Tài khoản chưa gắn nhân viên" })
-    const { latitude, longitude } = req.body
-    if (!latitude || !longitude) return res.status(400).json({ message: "Thiếu vị trí GPS" })
-
-    const [settingsRows] = await pool.execute("SELECT * FROM settings WHERE id = 1")
-    if (settingsRows.length === 0) return res.status(400).json({ message: "Chưa cài đặt vị trí công ty" })
-    const companyLat = parseFloat(settingsRows[0].company_lat)
-    const companyLng = parseFloat(settingsRows[0].company_lng)
-    const maxDist = parseFloat(settingsRows[0].max_distance || 500)
-    const distance = getDistanceMeters(latitude, longitude, companyLat, companyLng)
-
-    if (distance > maxDist) {
-      return res.status(403).json({ message: `Bạn đang ở ngoài phạm vi công ty (${Math.round(distance)}m)` })
-    }
-
-    const { now, nowVN, today } = getVietnamTime()
-    const [existing] = await pool.execute(
-      "SELECT id, check_in FROM attendances WHERE employee_id = ? AND work_date = ?",
-      [req.user.employee_id, today]
-    )
-    if (existing.length > 0 && existing[0].check_in) {
-      return res.status(400).json({ message: "Bạn đã check-in hôm nay" })
-    }
-
-    const hour = nowVN.getHours()
-    const minute = nowVN.getMinutes()
-    const status = (hour > 8 || (hour === 8 && minute > 30)) ? "Di tre" : "Dung gio"
-
-    if (existing.length === 0) {
-      await pool.execute(
-        "INSERT INTO attendances (employee_id, work_date, check_in, status) VALUES (?, ?, ?, ?)",
-        [req.user.employee_id, today, now, status]
-      )
-    } else {
-      await pool.execute("UPDATE attendances SET check_in=?, status=? WHERE id=?", [now, status, existing[0].id])
-    }
-
-    return res.json({ message: "Check-in thành công", check_in: now, status })
-  } catch (err) {
-    console.error(err)
-    return res.status(500).json({ message: "Lỗi server" })
-  }
-}
-
-export async function selfCheckOut(req, res) {
-  try {
-    if (!req.user.employee_id) return res.status(400).json({ message: "Tài khoản chưa gắn nhân viên" })
-    const { latitude, longitude } = req.body
-    if (!latitude || !longitude) return res.status(400).json({ message: "Thiếu vị trí GPS" })
-
-    const [settingsRows] = await pool.execute("SELECT * FROM settings WHERE id = 1")
-    if (settingsRows.length === 0) return res.status(400).json({ message: "Chưa cài đặt vị trí công ty" })
-    const companyLat = parseFloat(settingsRows[0].company_lat)
-    const companyLng = parseFloat(settingsRows[0].company_lng)
-    const maxDist = parseFloat(settingsRows[0].max_distance || 500)
-    const distance = getDistanceMeters(latitude, longitude, companyLat, companyLng)
-
-    if (distance > maxDist) {
-      return res.status(403).json({ message: `Bạn đang ở ngoài phạm vi công ty (${Math.round(distance)}m)` })
-    }
-
-    const { today } = getVietnamTime()
-    const [existing] = await pool.execute(
-      "SELECT id, check_in FROM attendances WHERE employee_id = ? AND work_date = ? AND check_in IS NOT NULL AND check_out IS NULL ORDER BY check_in DESC LIMIT 1",
-      [req.user.employee_id, today]
-    )
-    if (existing.length === 0) return res.status(400).json({ message: "Bạn chưa check-in hôm nay, không thể check-out" })
-
-    const now = new Date()
-    const checkInTime = new Date(existing[0].check_in)
-    const work_minutes = Math.round((now - checkInTime) / 60000)
-
-    await pool.execute("UPDATE attendances SET check_out=?, work_minutes=? WHERE id=?", [now, work_minutes, existing[0].id])
-
-    return res.json({ message: "Check-out thành công", check_out: now, work_minutes })
-  } catch (err) {
-    console.error(err)
-    return res.status(500).json({ message: "Lỗi server" })
-  }
 }
