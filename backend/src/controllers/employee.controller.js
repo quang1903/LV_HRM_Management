@@ -210,6 +210,9 @@ export async function importEmployees(req, res) {
     let successCount = 0
     const errors = []
 
+    // Tính hash mật khẩu mặc định 1 LẦN DUY NHẤT trước vòng lặp, không tính lại cho từng dòng
+    const defaultPasswordHash = await bcrypt.hash("123456", 10)
+
     const [maxRows] = await pool.execute(
       "SELECT employee_code FROM employees WHERE employee_code LIKE 'EMP%' ORDER BY CAST(SUBSTRING(employee_code, 4) AS UNSIGNED) DESC LIMIT 1"
     )
@@ -344,11 +347,10 @@ export async function importEmployees(req, res) {
           username = `${baseUsername}${counter}`
           counter++
         }
-        const hashed = await bcrypt.hash("123456", 10)
         await pool.execute(`
           INSERT INTO users (username, email, password, role, employee_id, is_active)
           VALUES (?, ?, ?, ?, ?, 1)
-        `, [username, email, hashed, finalRole, employeeId])
+        `, [username, email, defaultPasswordHash, finalRole, employeeId])
 
         successCount++
       } catch (rowErr) {
