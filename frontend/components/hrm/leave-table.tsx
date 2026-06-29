@@ -58,6 +58,23 @@ function getInitials(name: string) {
   return name?.split(" ").map(w => w[0]).slice(-2).join("").toUpperCase() || "?"
 }
 
+// Tính số ngày nghỉ thật — loại bỏ Chủ nhật, Thứ 7 vẫn tính là ngày làm việc
+function countWorkingDays(startStr: string, endStr: string) {
+  if (!startStr || !endStr) return 0
+  const start = new Date(startStr)
+  const end = new Date(endStr)
+  if (end < start) return 0
+  let count = 0
+  const current = new Date(start)
+  while (current <= end) {
+    if (current.getDay() !== 0) { // 0 = Chủ nhật
+      count++
+    }
+    current.setDate(current.getDate() + 1)
+  }
+  return count
+}
+
 export function LeaveTable() {
   const { user } = useAuth()
   const isHRorAdmin = user?.role === "admin" || user?.role === "hr"
@@ -373,11 +390,7 @@ export function LeaveTable() {
                     onChange={e => {
                       const start = e.target.value
                       const end = newLeave.end_date
-                      let days = newLeave.total_days
-                      if (start && end) {
-                        const diff = Math.ceil((new Date(end).getTime() - new Date(start).getTime()) / (1000 * 60 * 60 * 24)) + 1
-                        days = diff > 0 ? diff : 1
-                      }
+                      const days = countWorkingDays(start, end)
                       setNewLeave({ ...newLeave, start_date: start, total_days: days })
                     }} />
                 </div>
@@ -388,16 +401,12 @@ export function LeaveTable() {
                     onChange={e => {
                       const end = e.target.value
                       const start = newLeave.start_date
-                      let days = 1
-                      if (start && end) {
-                        const diff = Math.ceil((new Date(end).getTime() - new Date(start).getTime()) / (1000 * 60 * 60 * 24)) + 1
-                        days = diff > 0 ? diff : 1
-                      }
+                      const days = countWorkingDays(start, end)
                       setNewLeave({ ...newLeave, end_date: end, total_days: days })
                     }} />
                 </div>
                 <div>
-                  <label className="text-sm text-muted-foreground">Số ngày nghỉ</label>
+                  <label className="text-sm text-muted-foreground">Số ngày nghỉ (đã trừ Chủ nhật)</label>
                   <p className="mt-1 h-9 flex items-center px-3 text-sm font-medium bg-muted/50 rounded-md border border-input">
                     {newLeave.total_days} ngày
                   </p>

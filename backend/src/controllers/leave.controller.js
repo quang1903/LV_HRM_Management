@@ -50,7 +50,7 @@ export async function getLeaveById(req, res) {
 
 export async function createLeave(req, res) {
   try {
-    let { employee_id, request_type, start_date, end_date, total_days, reason } = req.body
+    let { employee_id, request_type, start_date, end_date, reason } = req.body
 
     // Chống IDOR: nhân viên chỉ được gửi đơn cho chính mình
     if (req.user.role === "employee") {
@@ -60,7 +60,7 @@ export async function createLeave(req, res) {
       employee_id = req.user.employee_id
     }
 
-    if (!employee_id || !request_type || !start_date || !end_date || !total_days) {
+    if (!employee_id || !request_type || !start_date || !end_date) {
       return res.status(400).json({ message: "Vui lòng nhập đầy đủ thông tin bắt buộc" })
     }
 
@@ -68,14 +68,37 @@ export async function createLeave(req, res) {
       return res.status(400).json({ message: "Ngày kết thúc không được nhỏ hơn ngày bắt đầu" })
     }
 
+    // Backend tự tính total_days, KHÔNG nhận từ Client để chống gian lận.
+    // Tính từng ngày trong khoảng, chỉ loại trừ Chủ nhật (Thứ 7 vẫn tính là ngày làm việc bình thường).
+    const total_days = countWorkingDays(start_date, end_date)
+    if (total_days <= 0) {
+      return res.status(400).json({ message: "Khoảng ngày nghỉ không hợp lệ (toàn bộ là Chủ nhật)" })
+    }
+
     const [result] = await pool.execute(`
       INSERT INTO leave_requests (employee_id, request_type, start_date, end_date, total_days, reason, status)
       VALUES (?, ?, ?, ?, ?, ?, 'Cho duyet')
     `, [employee_id, request_type, start_date, end_date, total_days, reason || null])
-    return res.status(201).json({ message: "Gửi đơn nghỉ phép thành công", id: result.insertId })
+    return res.status(201).json({ message: "Gửi đơn nghỉ phép thành công", id: result.insertId, total_days })
   } catch (err) {
+    console.error(err)
     return res.status(500).json({ message: "Lỗi server" })
   }
+}
+
+// Đếm số ngày nghỉ phép thật, loại bỏ Chủ nhật (getDay() === 0)
+function countWorkingDays(startStr, endStr) {
+  const start = new Date(startStr)
+  const end = new Date(endStr)
+  let count = 0
+  const current = new Date(start)
+  while (current <= end) {
+    if (current.getDay() !== 0) { // 0 = Chủ nhật
+      count++
+    }
+    current.setDate(current.getDate() + 1)
+  }
+  return count
 }
 
 export async function approveLeave(req, res) {
