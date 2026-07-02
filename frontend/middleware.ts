@@ -4,6 +4,7 @@ import type { NextRequest } from "next/server"
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   "/employees":   ["admin", "hr", "manager"],
   "/departments": ["admin", "hr"],
+  "/positions":   ["admin", "hr"],
   "/contracts":   ["admin", "hr", "manager"],
   "/reports":     ["admin", "hr", "manager"],
   "/attendance":  ["admin", "hr", "manager", "employee"],

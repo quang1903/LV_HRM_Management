@@ -173,6 +173,12 @@ export function EmployeeTable() {
       alert("Email không đúng định dạng (ví dụ: ten@company.com)")
       return
     }
+    if (!newEmployee.department_id) {
+      const confirmed = window.confirm(
+        "⚠️ Nhân viên này chưa được gán phòng ban.\n\nHậu quả:\n• Nhân viên sẽ không xuất hiện trong danh sách của bất kỳ Quản lý nào\n• Dữ liệu chấm công vẫn được lưu nhưng chỉ Admin/HR mới thấy\n\nBạn vẫn muốn tiếp tục?"
+      )
+      if (!confirmed) return
+    }
     const maxCode = employees.reduce((max, e) => {
       const num = parseInt(e.employee_code?.replace("EMP", "") || "0")
       return num > max ? num : max
@@ -371,7 +377,14 @@ export function EmployeeTable() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-5 py-4 text-muted-foreground">{employee.department_name || "—"}</td>
+                  <td className="px-5 py-4 text-muted-foreground">
+                    {employee.department_name ? employee.department_name : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                        <AlertTriangle className="h-3 w-3" />
+                        Chưa có phòng ban
+                      </span>
+                    )}
+                  </td>
                   <td className="px-5 py-4 text-muted-foreground">{employee.position_name || "—"}</td>
                   <td className="px-5 py-4">
                     <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset", statusStyles[employee.status] || "bg-slate-100 text-slate-600")}>
@@ -656,6 +669,12 @@ export function EmployeeTable() {
                   </select>
                 </div>
               </div>
+              {!newEmployee.department_id && (
+                <div className="flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  <span>Chưa chọn phòng ban — nhân viên này sẽ không xuất hiện trong danh sách của bất kỳ Quản lý nào</span>
+                </div>
+              )}
               <div className="flex gap-2 mt-4">
                 <Button variant="outline" className="flex-1" onClick={() => setShowAdd(false)}>Hủy</Button>
                 <Button className="flex-1" onClick={handleAdd}>Thêm</Button>
