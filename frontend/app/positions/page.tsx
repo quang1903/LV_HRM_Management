@@ -15,6 +15,8 @@ type Position = {
   name: string
   department_id: number | null
   department_name: string | null
+  employee_count: number
+  employees: { full_name: string; employee_code: string }[]
 }
 
 type Department = { id: number; name: string }
@@ -34,6 +36,7 @@ export default function PositionsPage() {
 
   const [editPosition, setEditPosition] = useState<Position | null>(null)
   const [deletePosition, setDeletePosition] = useState<Position | null>(null)
+  const [expandedPosition, setExpandedPosition] = useState<number | null>(null)
 
   useEffect(() => {
     fetchAll()
@@ -155,25 +158,48 @@ export default function PositionsPage() {
                         </span>
                       </div>
                       {g.items.map(pos => (
-                        <div key={pos.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-muted/30 transition-colors">
-                          <div className="flex items-center gap-3">
-                            <div className="h-2 w-2 rounded-full bg-primary/60" />
-                            <span className="text-sm font-medium">{pos.name}</span>
-                          </div>
-                          {canEdit && (
-                            <div className="flex items-center gap-1">
-                              <button type="button"
-                                onClick={() => setEditPosition({ ...pos })}
-                                className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground">
-                                <Pencil className="h-4 w-4" />
-                              </button>
-                              {canDelete && (
-                                <button type="button"
-                                  onClick={() => setDeletePosition(pos)}
-                                  className="rounded-md p-2 text-muted-foreground hover:bg-rose-50 hover:text-rose-600">
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
+                        <div key={pos.id}>
+                          <div className="flex items-center justify-between px-5 py-3.5 hover:bg-muted/30 transition-colors">
+                            <div className="flex items-center gap-3 cursor-pointer flex-1"
+                              onClick={() => setExpandedPosition(expandedPosition === pos.id ? null : pos.id)}>
+                              <div className="h-2 w-2 rounded-full bg-primary/60 shrink-0" />
+                              <span className="text-sm font-medium">{pos.name}</span>
+                              {pos.employee_count > 0 && (
+                                <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                                  {pos.employee_count} người
+                                </span>
                               )}
+                              {pos.employee_count === 0 && (
+                                <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                                  Chưa có ai
+                                </span>
+                              )}
+                            </div>
+                            {canEdit && (
+                              <div className="flex items-center gap-1">
+                                <button type="button"
+                                  onClick={() => setEditPosition({ ...pos })}
+                                  className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground">
+                                  <Pencil className="h-4 w-4" />
+                                </button>
+                                {canDelete && (
+                                  <button type="button"
+                                    onClick={() => setDeletePosition(pos)}
+                                    className="rounded-md p-2 text-muted-foreground hover:bg-rose-50 hover:text-rose-600">
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          {expandedPosition === pos.id && pos.employees.length > 0 && (
+                            <div className="bg-muted/20 border-t border-border px-8 py-2">
+                              {pos.employees.map(emp => (
+                                <div key={emp.employee_code} className="flex items-center gap-2 py-1.5 text-sm text-muted-foreground">
+                                  <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{emp.employee_code}</span>
+                                  <span>{emp.full_name}</span>
+                                </div>
+                              ))}
                             </div>
                           )}
                         </div>

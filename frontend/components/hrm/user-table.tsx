@@ -103,7 +103,10 @@ export function UserTable() {
   const handleEdit = async () => {
     if (!editUser) return
     try {
-      await userService.update(editUser.id, { role: editUser.role })
+      await userService.update(editUser.id, { 
+        role: editUser.role,
+        employee_id: editUser.employee_id
+      })
       setEditUser(null)
       fetchUsers()
     } catch (err: any) {
@@ -322,18 +325,35 @@ export function UserTable() {
                 <h3 className="text-lg font-semibold">Đổi quyền — {editUser.username}</h3>
                 <button onClick={() => setEditUser(null)}><X className="h-5 w-5" /></button>
               </div>
-              <div>
-                <label className="text-sm text-muted-foreground">Role</label>
-                <select
-                  className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
-                  value={editUser.role}
-                  onChange={e => setEditUser({ ...editUser, role: e.target.value })}
-                >
-                  <option value="admin">Quản trị viên</option>
-                  <option value="hr">Nhân sự</option>
-                  <option value="manager">Quản lý</option>
-                  <option value="employee">Nhân viên</option>
-                </select>
+              <div className="flex flex-col gap-3">
+                <div>
+                  <label className="text-sm text-muted-foreground">Role</label>
+                  <select
+                    className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
+                    value={editUser.role}
+                    onChange={e => setEditUser({ ...editUser, role: e.target.value })}
+                  >
+                    <option value="admin">Quản trị viên</option>
+                    <option value="hr">Nhân sự</option>
+                    <option value="manager">Quản lý</option>
+                    <option value="employee">Nhân viên</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground">Gắn với nhân viên</label>
+                  <select
+                    className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
+                    value={editUser.employee_id || ""}
+                    onChange={e => setEditUser({ ...editUser, employee_id: e.target.value ? Number(e.target.value) : null })}
+                  >
+                    <option value="">-- Chưa gắn --</option>
+                    {employees
+                      .filter((e: any) => e.status === "Dang lam")
+                      .map((e: any) => (
+                        <option key={e.id} value={e.id}>{e.employee_code} — {e.full_name}</option>
+                      ))}
+                  </select>
+                </div>
               </div>
               <div className="flex gap-2 mt-4">
                 <Button variant="outline" className="flex-1" onClick={() => setEditUser(null)}>Hủy</Button>
