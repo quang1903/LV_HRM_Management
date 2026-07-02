@@ -10,11 +10,14 @@ export async function getUsers(req, res) {
              u.employee_id,
              e.full_name, e.employee_code, e.department_id,
              d.name as department_name,
-             dm.name as managing_department_name
+             GROUP_CONCAT(dm.name SEPARATOR ', ') as managing_department_name
       FROM users u
       LEFT JOIN employees e ON u.employee_id = e.id
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN departments dm ON dm.manager_id = e.id
+      GROUP BY u.id, u.username, u.email, u.role, u.is_active, u.last_login_at, u.created_at,
+               u.employee_id, e.full_name, e.employee_code, e.department_id, d.name
+
     `
     const params = []
 

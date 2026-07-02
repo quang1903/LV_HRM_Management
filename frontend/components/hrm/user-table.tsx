@@ -69,7 +69,21 @@ export function UserTable() {
     try {
       setLoading(true)
       const res = await userService.getAll()
-      setUsers(res.data)
+      // Deduplicate theo id, ghép managing_department_name nếu có nhiều phòng
+      const map = new Map()
+      for (const u of res.data) {
+        if (map.has(u.id)) {
+          const existing = map.get(u.id)
+          if (u.managing_department_name) {
+            existing.managing_department_name = existing.managing_department_name
+              ? `${existing.managing_department_name}, ${u.managing_department_name}`
+              : u.managing_department_name
+          }
+        } else {
+          map.set(u.id, { ...u })
+        }
+      }
+      setUsers(Array.from(map.values()))
     } catch {
       alert("Không thể tải danh sách người dùng")
     } finally {
