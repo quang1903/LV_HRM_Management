@@ -57,6 +57,11 @@ export function DepartmentTable() {
     d.manager_name?.toLowerCase().includes(search.toLowerCase())
   )
 
+  // Danh sách manager_id đang được dùng
+  const usedManagerIds = departments
+    .filter(d => d.manager_id)
+    .map(d => d.manager_id)
+
   const handleEdit = async () => {
     if (!editDept) return
     try {
@@ -212,9 +217,11 @@ export function DepartmentTable() {
                     onChange={e => setEditDept({ ...editDept, manager_id: e.target.value ? Number(e.target.value) : null })}
                   >
                     <option value="">-- Chọn trưởng phòng --</option>
-                    {employees.map(e => (
-                      <option key={e.id} value={e.id}>{e.full_name} ({e.employee_code})</option>
-                    ))}
+                    {employees
+                      .filter(e => !usedManagerIds.includes(e.id) || e.id === editDept.manager_id)
+                      .map(e => (
+                        <option key={e.id} value={e.id}>{e.full_name} ({e.employee_code})</option>
+                      ))}
                   </select>
                 </div>
               </div>
@@ -279,9 +286,11 @@ export function DepartmentTable() {
                     onChange={e => setNewDept({ ...newDept, manager_id: e.target.value })}
                   >
                     <option value="">-- Chọn trưởng phòng --</option>
-                    {employees.map(e => (
-                      <option key={e.id} value={e.id}>{e.full_name} ({e.employee_code})</option>
-                    ))}
+                    {employees
+                      .filter(e => !usedManagerIds.includes(e.id))
+                      .map(e => (
+                        <option key={e.id} value={e.id}>{e.full_name} ({e.employee_code})</option>
+                      ))}
                   </select>
                 </div>
               </div>
