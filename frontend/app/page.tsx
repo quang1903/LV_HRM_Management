@@ -17,7 +17,7 @@ export default function Page() {
   const canSeeAlerts = user?.role === "admin" || user?.role === "hr"
 
   const [missingManagers, setMissingManagers] = useState<string[]>([])
-  const [dismissed, setDismissed] = useState(false)
+  const [showModal, setShowModal] = useState(false)
 
   useEffect(() => {
     if (!canSeeAlerts) return
@@ -27,6 +27,7 @@ export default function Page() {
           .filter((d: any) => !d.manager_id)
           .map((d: any) => d.name)
         setMissingManagers(missing)
+        if (missing.length > 0) setShowModal(true)
       })
       .catch(() => {})
   }, [canSeeAlerts])
@@ -35,7 +36,7 @@ export default function Page() {
     <div className="flex min-h-screen bg-muted/40">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar />
+        <Topbar missingManagers={missingManagers} />
         <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
           <div className="flex flex-col gap-6">
             <div>
@@ -46,38 +47,57 @@ export default function Page() {
                 Theo dõi các chỉ số quan trọng và hoạt động nhân sự trong công ty
               </p>
             </div>
-
-            {/* Banner cảnh báo */}
-            {canSeeAlerts && !dismissed && missingManagers.length > 0 && (
-              <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                <div className="flex-1">
-                  <p className="font-medium">
-                    {missingManagers.length} phòng ban chưa có Trưởng phòng
-                  </p>
-                  <p className="mt-0.5 text-amber-700">
-                    {missingManagers.join(", ")} — vào trang{" "}
-                    <Link href="/departments" className="underline font-medium hover:text-amber-900">
-                      Phòng ban
-                    </Link>{" "}
-                    để gán Trưởng phòng.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setDismissed(true)}
-                  className="text-amber-500 hover:text-amber-700"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            )}
-
             <StatCards />
             <ActivityPanel />
             {canSeeAllEmployees && <EmployeeTable />}
           </div>
         </main>
       </div>
+
+      {/* Popup modal thông báo */}
+      {canSeeAlerts && showModal && missingManagers.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <Link
+            href="/departments"
+            className="relative w-full max-w-md mx-4 rounded-2xl bg-white shadow-2xl overflow-hidden cursor-pointer block"
+            onClick={() => setShowModal(false)}
+          >
+            {/* Header đỏ */}
+            <div className="bg-rose-600 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-white" />
+                <span className="text-white font-bold text-base tracking-wide">THÔNG BÁO</span>
+              </div>
+              <button
+                onClick={e => { e.preventDefault(); e.stopPropagation(); setShowModal(false) }}
+                className="text-white/80 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Nội dung */}
+            <div className="px-6 py-6 text-center">
+              <p className="text-2xl font-bold text-rose-600 mb-2">
+                {missingManagers.length} phòng ban
+              </p>
+              <p className="text-gray-700 font-medium mb-4">
+                chưa có Trưởng phòng, cần xử lý ngay!
+              </p>
+              <div className="flex flex-wrap justify-center gap-2 mb-6">
+                {missingManagers.map(name => (
+                  <span key={name} className="rounded-full bg-rose-50 border border-rose-200 px-3 py-1 text-sm text-rose-700 font-medium">
+                    {name}
+                  </span>
+                ))}
+              </div>
+              <div className="inline-block rounded-lg bg-rose-600 px-6 py-2 text-white font-semibold text-sm hover:bg-rose-700 transition-colors">
+                Đến trang Phòng ban →
+              </div>
+            </div>
+          </Link>
+        </div>
+      )}
     </div>
   )
 }
