@@ -183,7 +183,7 @@ export function UserTable() {
       u.employee_code?.toLowerCase().includes(q)
 
     const matchDept = filterDept ? u.department_id === Number(filterDept) : true
-    const matchManager = filterManagerOnly ? managerEmployeeIds.has(u.employee_id) : true
+    const matchManager = filterManagerOnly ? (u.role === "manager" || u.role === "hr") : true
 
     return matchSearch && matchDept && matchManager
   })
@@ -221,7 +221,7 @@ export function UserTable() {
               className="gap-2"
               onClick={() => setFilterManagerOnly(!filterManagerOnly)}
             >
-              Chỉ trưởng phòng
+              Quản lý & HR
             </Button>
             <Button variant="outline" size="sm" className="gap-2" onClick={handleResetDeviceByDepartment}>
               <Building2 className="h-4 w-4" />Reset thiết bị cả phòng
