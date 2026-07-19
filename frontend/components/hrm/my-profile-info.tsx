@@ -142,6 +142,10 @@ export function MyProfileInfo() {
           <p className="mt-1 h-9 flex items-center px-3 text-sm bg-muted/50 rounded-md border border-input">{employee.birth_date?.substring(0, 10) || "—"}</p>
         </div>
         <div>
+          <label className="text-sm text-muted-foreground">CCCD</label>
+          <p className="mt-1 h-9 flex items-center px-3 text-sm bg-muted/50 rounded-md border border-input">{employee.id_card || "—"}</p>
+        </div>
+        <div>
           <label className="text-sm text-muted-foreground">Ngày vào làm</label>
           <p className="mt-1 h-9 flex items-center px-3 text-sm bg-muted/50 rounded-md border border-input">{employee.hire_date?.substring(0, 10)}</p>
         </div>

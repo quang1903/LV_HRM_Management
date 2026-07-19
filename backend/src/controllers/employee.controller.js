@@ -22,15 +22,20 @@ export async function getEmployees(req, res) {
         query += " ORDER BY e.created_at DESC"
         const [rows] = await pool.execute(query, params)
 
-        if (req.user.role === "employee") {
-            rows.forEach(row => {
-                if (row.id !== req.user.employee_id) {
-                    delete row.id_card
-                    delete row.address
-                    delete row.birth_date
-                }
-            })
-        }
+        rows.forEach(row => {
+          const isSelf = row.id === req.user.employee_id
+          if (req.user.role === "employee" && !isSelf) {
+            delete row.email
+            delete row.phone
+            delete row.id_card
+            delete row.address
+            delete row.birth_date
+          }
+          if (req.user.role === "manager" && !isSelf) {
+            delete row.id_card
+            delete row.address
+          }
+        })
 
         return res.json(rows)
     } catch (err) {
@@ -51,10 +56,17 @@ export async function getEmployeeById(req, res) {
         if (rows.length === 0) return res.status(404).json({ message: "Không tìm thấy nhân viên" })
 
         const employee = rows[0]
-        if (req.user.role === "employee" && employee.id !== req.user.employee_id) {
-            delete employee.id_card
-            delete employee.address
-            delete employee.birth_date
+        const isSelf = employee.id === req.user.employee_id
+        if (req.user.role === "employee" && !isSelf) {
+          delete employee.email
+          delete employee.phone
+          delete employee.id_card
+          delete employee.address
+          delete employee.birth_date
+        }
+        if (req.user.role === "manager" && !isSelf) {
+          delete employee.id_card
+          delete employee.address
         }
 
         return res.json(employee)

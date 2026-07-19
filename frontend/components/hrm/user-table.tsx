@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { userService } from "@/services/user"
 import { employeeService } from "@/services/employee"
 import { departmentService } from "@/services/department"
+import { useAuth } from "@/context/AuthContext"
 
 type User = {
   id: number
@@ -39,6 +40,7 @@ const roleStyles: Record<string, string> = {
 }
 
 export function UserTable() {
+  const { user: currentUser } = useAuth()
   const [users, setUsers] = useState<User[]>([])
   const [employees, setEmployees] = useState<any[]>([])
   const [departments, setDepartments] = useState<{ id: number; name: string; manager_id?: number }[]>([])
@@ -250,7 +252,9 @@ export function UserTable() {
                   <td className="px-5 py-4">
                     <div className="flex flex-col leading-tight">
                       <span className="font-medium">{u.username}</span>
-                      <span className="text-xs text-muted-foreground">{u.email}</span>
+                      {(currentUser?.role === "admin" || currentUser?.role === "hr" || u.id === currentUser?.id) && (
+                        <span className="text-xs text-muted-foreground">{u.email}</span>
+                      )}
                     </div>
                   </td>
                   <td className="px-5 py-4 text-muted-foreground">

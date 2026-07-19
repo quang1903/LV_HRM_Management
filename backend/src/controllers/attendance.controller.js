@@ -200,12 +200,11 @@ export async function checkOut(req, res) {
     if (employees.length === 0) return res.status(404).json({ message: "Không tìm thấy nhân viên" })
     const employee = employees[0]
 
-    const { today } = getVietnamTime()
     const [existing] = await pool.execute(
-      "SELECT id, check_in FROM attendances WHERE employee_id = ? AND work_date = ? AND check_in IS NOT NULL AND check_out IS NULL ORDER BY check_in DESC LIMIT 1",
-      [employee.id, today]
+      "SELECT id, check_in FROM attendances WHERE employee_id = ? AND check_in IS NOT NULL AND check_out IS NULL AND check_in >= DATE_SUB(NOW(), INTERVAL 24 HOUR) ORDER BY check_in DESC LIMIT 1",
+      [employee.id]
     )
-    if (existing.length === 0) return res.status(400).json({ message: "Bạn chưa check-in hôm nay, không thể check-out" })
+    if (existing.length === 0) return res.status(400).json({ message: "Không tìm thấy bản ghi check-in hợp lệ để check-out" })
     const now = new Date()
     const checkInTime = new Date(existing[0].check_in)
     const work_minutes = Math.round((now - checkInTime) / 60000)

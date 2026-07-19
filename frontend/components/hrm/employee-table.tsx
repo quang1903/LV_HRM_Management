@@ -373,7 +373,9 @@ export function EmployeeTable() {
                       </div>
                       <div className="flex flex-col leading-tight">
                         <span className="font-medium">{employee.full_name}</span>
-                        <span className="text-xs text-muted-foreground">{employee.email}</span>
+                        {(user?.role === "admin" || user?.role === "hr") && (
+                          <span className="text-xs text-muted-foreground">{employee.email}</span>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -466,6 +468,12 @@ export function EmployeeTable() {
                   { label: "Phòng ban", value: viewEmployee.department_name || "—" },
                   { label: "Chức vụ", value: viewEmployee.position_name || "—" },
                   { label: "Ngày vào", value: viewEmployee.hire_date?.substring(0, 10) },
+                  { label: "Ngày sinh", value: viewEmployee.birth_date?.substring(0, 10) || "—" },
+                  { label: "Giới tính", value: viewEmployee.gender === "Nam" ? "Nam" : viewEmployee.gender === "Nu" ? "Nữ" : viewEmployee.gender || "—" },
+                  ...(user?.role === "admin" || user?.role === "hr" ? [
+                    { label: "CCCD", value: viewEmployee.id_card || "—" },
+                    { label: "Địa chỉ", value: viewEmployee.address || "—" },
+                  ] : []),
                   { label: "Trạng thái", value: statusLabel[viewEmployee.status] || viewEmployee.status },
                 ].map(item => (
                   <div key={item.label} className="flex justify-between border-b border-border pb-2">
@@ -557,6 +565,23 @@ export function EmployeeTable() {
                     <option value="Nu">Nữ</option>
                     <option value="Khac">Khác</option>
                   </select>
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground">Ngày sinh</label>
+                  <input
+                    type="date"
+                    className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 ring-ring/40"
+                    value={editEmployee.birth_date?.substring(0, 10) || ""}
+                    onChange={e => setEditEmployee({ ...editEmployee, birth_date: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground">CCCD</label>
+                  <input
+                    className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 ring-ring/40"
+                    value={(editEmployee as any).id_card || ""}
+                    onChange={e => setEditEmployee({ ...editEmployee, id_card: e.target.value } as any)}
+                  />
                 </div>
               </div>
               <div className="flex gap-2 mt-4">
@@ -667,6 +692,33 @@ export function EmployeeTable() {
                     <option value="Nu">Nữ</option>
                     <option value="Khac">Khác</option>
                   </select>
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground">Ngày sinh</label>
+                  <input
+                    type="date"
+                    className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 ring-ring/40"
+                    value={newEmployee.birth_date}
+                    onChange={e => setNewEmployee({ ...newEmployee, birth_date: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground">CCCD</label>
+                  <input
+                    className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 ring-ring/40"
+                    placeholder="Số CCCD..."
+                    value={(newEmployee as any).id_card || ""}
+                    onChange={e => setNewEmployee({ ...newEmployee, id_card: e.target.value } as any)}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-sm text-muted-foreground">Địa chỉ</label>
+                  <input
+                    className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 ring-ring/40"
+                    placeholder="Địa chỉ..."
+                    value={newEmployee.address}
+                    onChange={e => setNewEmployee({ ...newEmployee, address: e.target.value })}
+                  />
                 </div>
               </div>
               {!newEmployee.department_id && (

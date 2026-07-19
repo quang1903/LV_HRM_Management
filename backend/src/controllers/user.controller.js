@@ -33,6 +33,15 @@ export async function getUsers(req, res) {
 
     query += " ORDER BY u.created_at DESC"
     const [rows] = await pool.execute(query, params)
+
+    // Ẩn email với role employee
+    if (req.user.role === "employee") {
+      rows.forEach((row) => {
+        if (row.id !== req.user.id) {
+          delete row.email
+        }
+      })
+    }
     return res.json(rows)
   } catch (err) {
     console.error(err)
