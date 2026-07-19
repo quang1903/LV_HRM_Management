@@ -8,18 +8,18 @@ import { useAuth } from "@/context/AuthContext"
 import { useState, useRef, useEffect } from "react"
 
 const pageLabels: Record<string, string> = {
-  "/":                 "Dashboard",
-  "/employees":        "Nhân viên",
-  "/departments":      "Phòng ban",
-  "/attendance":       "Chấm công",
-  "/leave":            "Nghỉ phép",
-  "/contracts":        "Hợp đồng",
-  "/reports":          "Báo cáo",
-  "/users":            "Người dùng",
-  "/settings":         "Cài đặt",
+  "/": "Dashboard",
+  "/employees": "Nhân viên",
+  "/departments": "Phòng ban",
+  "/attendance": "Chấm công",
+  "/leave": "Nghỉ phép",
+  "/contracts": "Hợp đồng",
+  "/reports": "Báo cáo",
+  "/users": "Người dùng",
+  "/settings": "Cài đặt",
   "/profile-requests": "Yêu cầu thay đổi",
-  "/profile":          "Trang cá nhân",
-  "/positions":        "Chức vụ",
+  "/profile": "Trang cá nhân",
+  "/positions": "Chức vụ",
 }
 
 type TopbarProps = {

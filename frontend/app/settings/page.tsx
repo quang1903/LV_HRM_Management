@@ -5,8 +5,11 @@ import { Sidebar } from "@/components/hrm/sidebar"
 import { Topbar } from "@/components/hrm/topbar"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { MapPin, Loader2, Lock, Unlock } from "lucide-react"
+import { MapPin, Loader2, Lock, Unlock, ScanLine } from "lucide-react"
 import { settingsService } from "@/services/settings"
+import axios from "axios"
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 
 export default function SettingsPage() {
   const [lat, setLat] = useState("")
@@ -17,6 +20,8 @@ export default function SettingsPage() {
 
   const [deviceLockEnabled, setDeviceLockEnabled] = useState(false)
   const [savingDeviceLock, setSavingDeviceLock] = useState(false)
+  const [scanPassword, setScanPassword] = useState("")
+  const [savingScanPassword, setSavingScanPassword] = useState(false)
 
   useEffect(() => {
     settingsService.get().then(res => {
@@ -82,6 +87,26 @@ export default function SettingsPage() {
     }
   }
 
+  const handleSaveScanPassword = async () => {
+    if (!scanPassword) {
+      alert("Vui lòng nhập mật khẩu máy quét")
+      return
+    }
+    try {
+      setSavingScanPassword(true)
+      await axios.post(`${API_URL}/settings/scan-password`, 
+        { scan_password: scanPassword },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("hrm_access_token")}` } }
+      )
+      alert("Đã lưu mật khẩu máy quét!")
+      setScanPassword("")
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Lỗi khi lưu")
+    } finally {
+      setSavingScanPassword(false)
+    }
+  }
+
   return (
     <div className="flex min-h-screen bg-muted/40">
       <Sidebar />
@@ -93,7 +118,7 @@ export default function SettingsPage() {
             <p className="text-sm text-muted-foreground">Vị trí công ty và bảo mật thiết bị</p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <Card className="p-6">
             <h3 className="text-sm font-semibold mb-3">Vị trí công ty</h3>
             <Button
@@ -168,6 +193,29 @@ export default function SettingsPage() {
             <span className="ml-3 text-sm font-medium">
               {deviceLockEnabled ? "Đang bật" : "Đang tắt"}
             </span>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-center gap-2 mb-1">
+              <ScanLine className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold">Mật khẩu máy quét</h3>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Đặt mật khẩu để kích hoạt trang /scan tại máy quét cổng công ty. 
+              Nhân viên không biết mật khẩu này sẽ không thể sử dụng máy quét.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 ring-ring/40"
+                placeholder="Nhập mật khẩu mới..."
+                value={scanPassword}
+                onChange={e => setScanPassword(e.target.value)}
+              />
+              <Button onClick={handleSaveScanPassword} disabled={savingScanPassword} size="sm">
+                {savingScanPassword ? <Loader2 className="h-4 w-4 animate-spin" /> : "Lưu"}
+              </Button>
+            </div>
           </Card>
           </div>
         </main>

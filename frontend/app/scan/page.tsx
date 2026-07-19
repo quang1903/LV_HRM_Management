@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from "react"
 import { Html5Qrcode } from "html5-qrcode"
-import { Briefcase, CheckCircle2, XCircle, Loader2, MapPin } from "lucide-react"
+import { Briefcase, CheckCircle2, XCircle, Loader2, MapPin, KeyRound } from "lucide-react"
 import axios from "axios"
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api")
+const TERMINAL_TOKEN_KEY = "scan_terminal_token"
 
 export default function ScanPage() {
   const scannerRef = useRef<Html5Qrcode | null>(null)
@@ -19,7 +20,26 @@ export default function ScanPage() {
   const [locationError, setLocationError] = useState("")
   const coordsRef = useRef<{ latitude: number; longitude: number } | null>(null)
 
+  // Terminal Token
+  const [terminalToken, setTerminalToken] = useState<string | null>(null)
+  const [showActivate, setShowActivate] = useState(false)
+  const [activatePassword, setActivatePassword] = useState("")
+  const [activating, setActivating] = useState(false)
+  const [activateError, setActivateError] = useState("")
+
+  // Kiểm tra token trong localStorage
   useEffect(() => {
+    const token = localStorage.getItem(TERMINAL_TOKEN_KEY)
+    if (token) {
+      setTerminalToken(token)
+    } else {
+      setShowActivate(true)
+    }
+  }, [])
+
+  // Xin quyền GPS
+  useEffect(() => {
+    if (!terminalToken) return
     if (!navigator.geolocation) {
       setLocationStatus("error")
       setLocationError("Thiết bị không hỗ trợ định vị")
@@ -39,14 +59,13 @@ export default function ScanPage() {
       },
       { enableHighAccuracy: true }
     )
-  }, [])
+  }, [terminalToken])
 
+  // Mở camera
   useEffect(() => {
-    if (locationStatus !== "ok") return
-
+    if (locationStatus !== "ok" || !terminalToken) return
     const scanner = new Html5Qrcode("qr-reader")
     scannerRef.current = scanner
-
     scanner.start(
       { facingMode: "environment" },
       { fps: 10, qrbox: 250 },
@@ -55,11 +74,28 @@ export default function ScanPage() {
     ).then(() => setScanning(true)).catch(err => {
       setResult({ message: "Không thể mở camera: " + err, success: false })
     })
+    return () => { scanner.stop().catch(() => {}) }
+  }, [locationStatus, terminalToken])
 
-    return () => {
-      scanner.stop().catch(() => {})
+  const handleActivate = async () => {
+    if (!activatePassword) {
+      setActivateError("Vui lòng nhập mật khẩu")
+      return
     }
-  }, [locationStatus])
+    try {
+      setActivating(true)
+      setActivateError("")
+      const res = await axios.post(`${API_URL}/settings/scan-activate`, { password: activatePassword })
+      const token = res.data.token
+      localStorage.setItem(TERMINAL_TOKEN_KEY, token)
+      setTerminalToken(token)
+      setShowActivate(false)
+    } catch (err: any) {
+      setActivateError(err.response?.data?.message || "Mật khẩu không đúng")
+    } finally {
+      setActivating(false)
+    }
+  }
 
   const onScanSuccess = async (decodedText: string) => {
     if (cooldownRef.current || decodedText === lastScanRef.current) return
@@ -69,9 +105,12 @@ export default function ScanPage() {
     setTimeout(() => { cooldownRef.current = false; lastScanRef.current = "" }, 3000)
 
     const { latitude, longitude } = coordsRef.current
+    const token = localStorage.getItem(TERMINAL_TOKEN_KEY) || ""
+    const headers = { "x-terminal-token": token }
 
     try {
-      const res = await axios.post(`${API_URL}/attendances/checkin`, { qr_value: decodedText, latitude, longitude })
+      const res = await axios.post(`${API_URL}/attendances/checkin`, 
+        { qr_value: decodedText, latitude, longitude }, { headers })
       const time = new Date(res.data.check_in).toLocaleTimeString("vi-VN")
       setResult({ message: `Check-in lúc ${time}`, success: true, name: res.data.full_name })
       setHistory(prev => [{ name: res.data.full_name, time: `Vào ${time}` }, ...prev].slice(0, 8))
@@ -79,20 +118,69 @@ export default function ScanPage() {
       const msg = err.response?.data?.message || ""
       if (msg.includes("đã check-in")) {
         try {
-          const res2 = await axios.post(`${API_URL}/attendances/checkout`, { qr_value: decodedText, latitude, longitude })
+          const res2 = await axios.post(`${API_URL}/attendances/checkout`, 
+            { qr_value: decodedText, latitude, longitude }, { headers })
           const time = new Date(res2.data.check_out).toLocaleTimeString("vi-VN")
           setResult({ message: `Check-out lúc ${time}`, success: true, name: res2.data.full_name })
           setHistory(prev => [{ name: res2.data.full_name, time: `Ra ${time}` }, ...prev].slice(0, 8))
         } catch (err2: any) {
-          setResult({ message: err2.response?.data?.message || "Lỗi xử lý", success: false })
+          const msg2 = err2.response?.data?.message || ""
+          // Token hết hạn
+          if (err2.response?.status === 401) {
+            localStorage.removeItem(TERMINAL_TOKEN_KEY)
+            setTerminalToken(null)
+            setShowActivate(true)
+          }
+          setResult({ message: msg2 || "Lỗi xử lý", success: false })
         }
+      } else if (err.response?.status === 401) {
+        // Token hết hạn hoặc không hợp lệ
+        localStorage.removeItem(TERMINAL_TOKEN_KEY)
+        setTerminalToken(null)
+        setShowActivate(true)
       } else {
         setResult({ message: msg || "Lỗi xử lý", success: false })
       }
     }
   }
 
-  // Chưa lấy được vị trí, hoặc bị chặn quyền định vị
+  // Modal kích hoạt máy quét
+  if (showActivate) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="w-full max-w-sm bg-slate-800 rounded-2xl p-6 shadow-2xl">
+          <div className="flex flex-col items-center mb-6">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/20 mb-3">
+              <KeyRound className="h-7 w-7 text-primary" />
+            </div>
+            <h2 className="text-white text-lg font-bold">Kích hoạt máy quét</h2>
+            <p className="text-slate-400 text-sm text-center mt-1">
+              Nhập mật khẩu do Admin cài đặt để kích hoạt thiết bị này
+            </p>
+          </div>
+          <input
+            type="password"
+            className="w-full h-10 rounded-lg bg-slate-700 border border-slate-600 px-3 text-white text-sm outline-none focus:ring-2 ring-primary/40 mb-3"
+            placeholder="Mật khẩu máy quét..."
+            value={activatePassword}
+            onChange={e => setActivatePassword(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleActivate()}
+          />
+          {activateError && (
+            <p className="text-rose-400 text-xs mb-3 text-center">{activateError}</p>
+          )}
+          <button
+            onClick={handleActivate}
+            disabled={activating}
+            className="w-full h-10 rounded-lg bg-primary text-white font-medium text-sm flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors"
+          >
+            {activating ? <Loader2 className="h-4 w-4 animate-spin" /> : "Kích hoạt"}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   if (locationStatus === "checking") {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">

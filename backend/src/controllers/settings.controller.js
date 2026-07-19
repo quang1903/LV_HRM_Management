@@ -56,3 +56,39 @@ export async function updateDeviceLock(req, res) {
     return res.status(500).json({ message: "Lỗi server" })
   }
 }
+
+export async function updateScanPassword(req, res) {
+  try {
+    const { scan_password } = req.body
+    if (!scan_password) return res.status(400).json({ message: "Vui lòng nhập mật khẩu" })
+    const [existing] = await pool.execute("SELECT id FROM settings WHERE id = 1")
+    if (existing.length === 0) {
+      await pool.execute("INSERT INTO settings (id, scan_password) VALUES (1, ?)", [scan_password])
+    } else {
+      await pool.execute("UPDATE settings SET scan_password=? WHERE id=1", [scan_password])
+    }
+    return res.json({ message: "Đã lưu mật khẩu máy quét" })
+  } catch (err) {
+    return res.status(500).json({ message: "Lỗi server" })
+  }
+}
+
+export async function activateScanTerminal(req, res) {
+  try {
+    const { password } = req.body
+    if (!password) return res.status(400).json({ message: "Vui lòng nhập mật khẩu" })
+    const [rows] = await pool.execute("SELECT scan_password FROM settings WHERE id = 1")
+    if (rows.length === 0 || !rows[0].scan_password) {
+      return res.status(400).json({ message: "Chưa cài đặt mật khẩu máy quét" })
+    }
+    if (password !== rows[0].scan_password) {
+      return res.status(401).json({ message: "Mật khẩu không đúng" })
+    }
+    // Sinh token ngẫu nhiên
+    const token = Math.random().toString(36).substring(2) + Date.now().toString(36)
+    await pool.execute("UPDATE settings SET scan_token=? WHERE id=1", [token])
+    return res.json({ token })
+  } catch (err) {
+    return res.status(500).json({ message: "Lỗi server" })
+  }
+}
