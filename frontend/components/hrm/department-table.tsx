@@ -17,7 +17,7 @@ type Department = {
   total_employees?: number
 }
 
-type Employee = { id: number; full_name: string; employee_code: string }
+type Employee = { id: number; full_name: string; employee_code: string; department_id: number | null }
 
 export function DepartmentTable() {
   const { user } = useAuth()
@@ -218,7 +218,10 @@ export function DepartmentTable() {
                   >
                     <option value="">-- Chọn trưởng phòng --</option>
                     {employees
-                      .filter(e => !usedManagerIds.includes(e.id) || e.id === editDept.manager_id)
+                      .filter(e => 
+                        e.department_id === editDept.id && 
+                        (!usedManagerIds.includes(e.id) || e.id === editDept.manager_id)
+                      )
                       .map(e => (
                         <option key={e.id} value={e.id}>{e.full_name} ({e.employee_code})</option>
                       ))}
@@ -285,11 +288,11 @@ export function DepartmentTable() {
                     value={newDept.manager_id}
                     onChange={e => setNewDept({ ...newDept, manager_id: e.target.value })}
                   >
-                    <option value="">-- Chọn trưởng phòng --</option>
+                    <option value="">-- Chọn trưởng phòng (có thể gán sau) --</option>
                     {employees
                       .filter(e => !usedManagerIds.includes(e.id))
                       .map(e => (
-                        <option key={e.id} value={e.id}>{e.full_name} ({e.employee_code})</option>
+                        <option key={e.id} value={e.id}>{e.full_name} ({e.employee_code}) - {(e as any).department_name || "Chưa có phòng"}</option>
                       ))}
                   </select>
                 </div>

@@ -24,7 +24,7 @@ export default function Page() {
     departmentService.getAll()
       .then(res => {
         const missing = res.data
-          .filter((d: any) => !d.manager_id)
+          .filter((d: any) => !d.manager_id && d.name !== "Nhan su")
           .map((d: any) => d.name)
         setMissingManagers(missing)
         if (missing.length > 0) setShowModal(true)

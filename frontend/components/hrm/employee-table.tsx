@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Eye, Pencil, Trash2, Search, Download, X, Plus, Loader2, AlertTriangle, Upload, FileSpreadsheet } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import { Eye, Pencil, Trash2, Search, Download, X, Plus, Loader2, AlertTriangle, Upload, FileSpreadsheet, ChevronLeft, ChevronRight, Calendar } from "lucide-react"
 import * as XLSX from "xlsx"
 import { exportToExcel } from "@/lib/exportExcel"
 import { Card } from "@/components/ui/card"
@@ -47,6 +47,155 @@ const statusLabel: Record<string, string> = {
 
 function getInitials(name: string) {
   return name?.split(" ").map(w => w[0]).slice(-2).join("").toUpperCase() || "?"
+}
+
+const MONTHS_VI = ["Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"]
+const DAYS_VI = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"]
+
+function CalendarPicker({ value, onChange }: { value: string; onChange: (val: string) => void }) {
+  const today = new Date()
+  const parsed = value ? new Date(value) : null
+  const [viewYear, setViewYear] = useState(parsed?.getFullYear() || today.getFullYear() - 25)
+  const [viewMonth, setViewMonth] = useState(parsed?.getMonth() || 0)
+  const [open, setOpen] = useState(false)
+  const [mode, setMode] = useState<"day" | "month" | "year">("day")
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: globalThis.MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [])
+
+  const selectedDate = value ? new Date(value + "T00:00:00") : null
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay()
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
+  const cells = [
+    ...Array.from({ length: firstDay }, () => null),
+    ...Array.from({ length: daysInMonth }, (_: any, i) => i + 1)
+  ]
+
+  const displayValue = selectedDate
+    ? `${String(selectedDate.getDate()).padStart(2, "0")}/${String(selectedDate.getMonth() + 1).padStart(2, "0")}/${selectedDate.getFullYear()}`
+    : ""
+
+  const years = Array.from({ length: new Date().getFullYear() - 1899 }, (_: any, i) => new Date().getFullYear() - i)
+
+  return (
+    <div className="relative mt-1" ref={ref}>
+      <div
+        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm flex items-center justify-between cursor-pointer hover:border-primary transition-colors focus-within:ring-2 ring-ring/40"
+        onClick={() => setOpen(!open)}
+      >
+        <span className={displayValue ? "text-foreground" : "text-muted-foreground"}>
+          {displayValue || "Chọn ngày sinh"}
+        </span>
+        <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+      </div>
+
+      {open && (
+        <div className="absolute z-50 bottom-full mb-1 w-72 rounded-xl border border-border bg-background shadow-xl overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 bg-primary text-primary-foreground">
+            <button type="button" onClick={() => {
+              if (mode === "day") { const d = new Date(viewYear, viewMonth - 1); setViewMonth(d.getMonth()); setViewYear(d.getFullYear()) }
+              else if (mode === "year") setViewYear(v => v - 12)
+            }} className="p-1 rounded hover:bg-white/20 transition-colors">
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setMode(mode === "month" ? "day" : "month")}
+                className="text-sm font-semibold hover:bg-white/20 px-2 py-1 rounded transition-colors">
+                {MONTHS_VI[viewMonth]}
+              </button>
+              <button type="button" onClick={() => setMode(mode === "year" ? "day" : "year")}
+                className="text-sm font-semibold hover:bg-white/20 px-2 py-1 rounded transition-colors">
+                {viewYear}
+              </button>
+            </div>
+            <button type="button" onClick={() => {
+              if (mode === "day") { const d = new Date(viewYear, viewMonth + 1); setViewMonth(d.getMonth()); setViewYear(d.getFullYear()) }
+              else if (mode === "year") setViewYear(v => v + 12)
+            }} className="p-1 rounded hover:bg-white/20 transition-colors">
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Mode: chọn tháng */}
+          {mode === "month" && (
+            <div className="grid grid-cols-3 gap-2 p-3">
+              {MONTHS_VI.map((m, i) => (
+                <button key={i} type="button"
+                  onClick={() => { setViewMonth(i); setMode("day") }}
+                  className={cn("py-2 rounded-lg text-xs font-medium transition-colors",
+                    viewMonth === i ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                  )}>
+                  {m}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Mode: chọn năm */}
+          {mode === "year" && (
+            <div className="grid grid-cols-3 gap-2 p-3 max-h-48 overflow-y-auto">
+              {years.map(y => (
+                <button key={y} type="button"
+                  onClick={() => { setViewYear(y); setMode("day") }}
+                  className={cn("py-2 rounded-lg text-xs font-medium transition-colors",
+                    viewYear === y ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                  )}>
+                  {y}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Mode: chọn ngày */}
+          {mode === "day" && (
+            <div className="p-3">
+              <div className="grid grid-cols-7 mb-1">
+                {DAYS_VI.map(d => (
+                  <div key={d} className="text-center text-xs font-medium text-muted-foreground py-1">{d}</div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-0.5">
+                {cells.map((day: any, i) => {
+                  if (!day) return <div key={i} />
+                  const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+                  const isSelected = value === dateStr
+                  const isToday = day !== null && today.getDate() === day && today.getMonth() === viewMonth && today.getFullYear() === viewYear
+                  return (
+                    <button key={i} type="button"
+                      onClick={() => { onChange(dateStr); setOpen(false) }}
+                      className={cn(
+                        "h-8 w-full rounded-lg text-xs font-medium transition-colors",
+                        isSelected ? "bg-primary text-primary-foreground" :
+                          isToday ? "border border-primary text-primary" :
+                            "hover:bg-muted text-foreground"
+                      )}>
+                      {day}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Footer */}
+          {value && (
+            <div className="border-t border-border px-3 py-2 flex justify-between items-center">
+              <span className="text-xs text-muted-foreground">{displayValue}</span>
+              <button type="button" onClick={() => { onChange(""); setOpen(false) }}
+                className="text-xs text-rose-500 hover:text-rose-700">Xóa</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function EmployeeTable() {
@@ -570,11 +719,9 @@ export function EmployeeTable() {
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground">Ngày sinh</label>
-                  <input
-                    type="date"
-                    className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 ring-ring/40"
+                  <CalendarPicker
                     value={editEmployee.birth_date?.substring(0, 10) || ""}
-                    onChange={e => setEditEmployee({ ...editEmployee, birth_date: e.target.value })}
+                    onChange={val => setEditEmployee({ ...editEmployee, birth_date: val })}
                   />
                 </div>
                 <div>
@@ -697,11 +844,9 @@ export function EmployeeTable() {
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground">Ngày sinh</label>
-                  <input
-                    type="date"
-                    className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 ring-ring/40"
+                  <CalendarPicker
                     value={newEmployee.birth_date}
-                    onChange={e => setNewEmployee({ ...newEmployee, birth_date: e.target.value })}
+                    onChange={val => setNewEmployee({ ...newEmployee, birth_date: val })}
                   />
                 </div>
                 <div>
