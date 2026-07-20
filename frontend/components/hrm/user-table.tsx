@@ -149,22 +149,39 @@ export function UserTable() {
     }
   }
 
-  const handleResetDeviceByDepartment = async () => {
-    const deptOptions = departments.map(d => `${d.id}: ${d.name}`).join("\n")
-    const input = prompt(`Nhập ID phòng ban cần reset toàn bộ thiết bị:\n${deptOptions}`)
-    if (!input) return
-    const deptId = Number(input)
-    if (!deptId) {
-      alert("ID phòng ban không hợp lệ")
-      return
-    }
-    const dept = departments.find(d => d.id === deptId)
-    if (!confirm(`Reset thiết bị cho TẤT CẢ nhân viên phòng "${dept?.name || deptId}"? Hành động này ảnh hưởng nhiều người, hãy chắc chắn trước khi tiếp tục.`)) return
-    try {
-      const res = await employeeService.resetDeviceByDepartment(deptId)
-      alert(res.data.message || "Đã reset thiết bị toàn phòng!")
-    } catch (err: any) {
-      alert(err.response?.data?.message || "Lỗi khi reset thiết bị toàn phòng")
+  const [showResetModal, setShowResetModal] = useState(false)
+  const [resetDeptId, setResetDeptId] = useState("")
+  const [resetting, setResetting] = useState(false)
+
+  const handleResetDevice = async () => {
+    if (resetDeptId) {
+      // Reset theo phòng
+      const dept = departments.find(d => d.id === Number(resetDeptId))
+      if (!confirm(`Reset thiết bị cho TẤT CẢ nhân viên phòng "${dept?.name}"?`)) return
+      try {
+        setResetting(true)
+        const res = await employeeService.resetDeviceByDepartment(Number(resetDeptId))
+        alert(res.data.message || "Đã reset thiết bị toàn phòng!")
+        setShowResetModal(false)
+        setResetDeptId("")
+      } catch (err: any) {
+        alert(err.response?.data?.message || "Lỗi")
+      } finally {
+        setResetting(false)
+      }
+    } else {
+      // Reset tất cả
+      if (!confirm("Reset thiết bị cho TẤT CẢ nhân viên trong hệ thống?")) return
+      try {
+        setResetting(true)
+        const res = await employeeService.resetDeviceAll()
+        alert(res.data.message || "Đã reset tất cả!")
+        setShowResetModal(false)
+      } catch (err: any) {
+        alert(err.response?.data?.message || "Lỗi")
+      } finally {
+        setResetting(false)
+      }
     }
   }
 
@@ -225,8 +242,8 @@ export function UserTable() {
             >
               Quản lý & HR
             </Button>
-            <Button variant="outline" size="sm" className="gap-2" onClick={handleResetDeviceByDepartment}>
-              <Building2 className="h-4 w-4" />Reset thiết bị cả phòng
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowResetModal(true)}>
+              <Building2 className="h-4 w-4" />Reset thiết bị
             </Button>
             <Button size="sm" className="gap-2" onClick={() => setShowAdd(true)}>
               <Plus className="h-4 w-4" />Tạo tài khoản
@@ -450,6 +467,43 @@ export function UserTable() {
               <div className="flex gap-2 mt-4">
                 <Button variant="outline" className="flex-1" onClick={() => setShowAdd(false)}>Hủy</Button>
                 <Button className="flex-1" onClick={handleAdd}>Tạo</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {showResetModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="w-full max-w-sm rounded-lg bg-background p-6 shadow-lg">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Reset thiết bị</h3>
+                <button onClick={() => { setShowResetModal(false); setResetDeptId("") }}><X className="h-5 w-5" /></button>
+              </div>
+              <div className="flex flex-col gap-3">
+                <div>
+                  <label className="text-sm text-muted-foreground">Chọn phòng ban (để trống = reset tất cả)</label>
+                  <select
+                    className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
+                    value={resetDeptId}
+                    onChange={e => setResetDeptId(e.target.value)}
+                  >
+                    <option value="">-- Reset tất cả --</option>
+                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {resetDeptId
+                    ? `Sẽ reset thiết bị cho tất cả nhân viên phòng "${departments.find(d => d.id === Number(resetDeptId))?.name}"`
+                    : "Sẽ reset thiết bị cho TẤT CẢ nhân viên trong hệ thống"}
+                </p>
+              </div>
+              <div className="flex gap-2 mt-4">
+                <Button variant="outline" className="flex-1" onClick={() => { setShowResetModal(false); setResetDeptId("") }}>Hủy</Button>
+                <Button variant="destructive" className="flex-1" onClick={handleResetDevice} disabled={resetting}>
+                  {resetting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Reset
+                </Button>
               </div>
             </div>
           </div>

@@ -1,5 +1,5 @@
 import { Router } from "express"
-import { getEmployees, getEmployeeById, createEmployee, updateEmployee, deactivateEmployee, activateEmployee, permanentDelete, getMyQRSecret, importEmployees } from "../controllers/employee.controller.js"
+import { getEmployees, getEmployeeById, createEmployee, updateEmployee, deactivateEmployee, activateEmployee, permanentDelete, getMyQRSecret, importEmployees, resetDeviceAll } from "../controllers/employee.controller.js"
 import { authMiddleware, roleMiddleware } from "../middlewares/auth.middleware.js"
 
 const router = Router()
@@ -13,5 +13,6 @@ router.put("/:id",  authMiddleware, roleMiddleware("admin", "hr"), updateEmploye
 router.delete("/:id", authMiddleware, roleMiddleware("admin", "hr"), deactivateEmployee)
 router.patch("/:id/activate", authMiddleware, roleMiddleware("admin", "hr"), activateEmployee)
 router.delete("/:id/permanent", authMiddleware, roleMiddleware("admin"), permanentDelete)
+router.post("/reset-device-all", authMiddleware, roleMiddleware("admin", "hr"), resetDeviceAll)
 
 export default router

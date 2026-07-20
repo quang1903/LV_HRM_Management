@@ -11,4 +11,5 @@ export const employeeService = {
   importEmployees: (data: any[]) => api.post("/employees/import", { data }),
   resetDevice: (employeeId: number) => api.patch(`/users/employee/${employeeId}/reset-device`),
   resetDeviceByDepartment: (deptId: number) => api.patch(`/users/department/${deptId}/reset-device`),
+  resetDeviceAll: () => api.post("/employees/reset-device-all"),
 }

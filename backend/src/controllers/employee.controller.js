@@ -429,3 +429,14 @@ function normalizeExcelDate(value) {
   if (isNaN(date.getTime())) return null
   return date.toISOString().split("T")[0]
 }
+
+export async function resetDeviceAll(req, res) {
+  try {
+    const [result] = await pool.execute(
+      "UPDATE users SET device_id = NULL WHERE role != 'admin'"
+    )
+    return res.json({ message: `Đã reset thiết bị cho ${result.affectedRows} tài khoản` })
+  } catch (err) {
+    return res.status(500).json({ message: "Lỗi server" })
+  }
+}
