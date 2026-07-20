@@ -28,6 +28,7 @@ type Employee = {
   birth_date: string | null
   gender: string | null
   address: string | null
+  id_card: string | null
 }
 
 type Department = { id: number; name: string }
@@ -66,7 +67,8 @@ export function EmployeeTable() {
   const [showAdd, setShowAdd] = useState(false)
   const [newEmployee, setNewEmployee] = useState({
     employee_code: "", full_name: "", email: "", phone: "",
-    department_id: "", position_id: "", hire_date: "", gender: "Nam", birth_date: "", address: ""
+    department_id: "", position_id: "", hire_date: "", gender: "Nam", birth_date: "", address: "",
+    id_card: ""
   })
   const [importing, setImporting] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
@@ -192,7 +194,7 @@ export function EmployeeTable() {
         position_id: newEmployee.position_id ? Number(newEmployee.position_id) : null,
       })
       setShowAdd(false)
-      setNewEmployee({ employee_code: "", full_name: "", email: "", phone: "", department_id: "", position_id: "", hire_date: "", gender: "Nam", birth_date: "", address: "" })
+      setNewEmployee({ employee_code: "", full_name: "", email: "", phone: "", department_id: "", position_id: "", hire_date: "", gender: "Nam", birth_date: "", address: "", id_card: "" })
       setPositions([])
       fetchEmployees()
     } catch (err: any) {
@@ -579,8 +581,8 @@ export function EmployeeTable() {
                   <label className="text-sm text-muted-foreground">CCCD</label>
                   <input
                     className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 ring-ring/40"
-                    value={(editEmployee as any).id_card || ""}
-                    onChange={e => setEditEmployee({ ...editEmployee, id_card: e.target.value } as any)}
+                    value={editEmployee.id_card || ""}
+                    onChange={e => setEditEmployee({ ...editEmployee, id_card: e.target.value })}
                   />
                 </div>
               </div>
@@ -707,8 +709,8 @@ export function EmployeeTable() {
                   <input
                     className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 ring-ring/40"
                     placeholder="Số CCCD..."
-                    value={(newEmployee as any).id_card || ""}
-                    onChange={e => setNewEmployee({ ...newEmployee, id_card: e.target.value } as any)}
+                    value={newEmployee.id_card || ""}
+                    onChange={e => setNewEmployee({ ...newEmployee, id_card: e.target.value })}
                   />
                 </div>
                 <div className="sm:col-span-2">
