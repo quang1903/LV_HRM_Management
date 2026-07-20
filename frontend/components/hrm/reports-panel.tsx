@@ -17,27 +17,57 @@ function AttendanceBarChart({ data }: { data: { date: string; count: number }[] 
   useEffect(() => {
     if (!canvasRef.current || !data.length) return
     if (chartRef.current) chartRef.current.destroy()
-    chartRef.current = new Chart(canvasRef.current, {
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext("2d")!
+    const gradient = ctx.createLinearGradient(0, 0, 0, 300)
+    gradient.addColorStop(0, "rgba(59, 130, 246, 0.9)")
+    gradient.addColorStop(1, "rgba(59, 130, 246, 0.1)")
+
+    chartRef.current = new Chart(canvas, {
       type: "bar",
       data: {
         labels: data.map(d => d.date.substring(5)),
         datasets: [{
           label: "Số nhân viên đi làm",
           data: data.map(d => d.count),
-          backgroundColor: "rgba(59, 130, 246, 0.7)",
+          backgroundColor: gradient,
           borderColor: "rgba(59, 130, 246, 1)",
-          borderWidth: 1,
-          borderRadius: 6,
+          borderWidth: 0,
+          borderRadius: 8,
+          borderSkipped: false,
         }]
       },
       options: {
         responsive: true,
+        animation: {
+          duration: 800,
+          easing: "easeInOutQuart"
+        },
         plugins: {
           legend: { display: false },
-          tooltip: { mode: "index" }
+          tooltip: {
+            backgroundColor: "rgba(15, 23, 42, 0.9)",
+            titleColor: "#94a3b8",
+            bodyColor: "#f1f5f9",
+            padding: 12,
+            cornerRadius: 8,
+            displayColors: false,
+            callbacks: {
+              title: (items) => `Ngày ${items[0].label}`,
+              label: (item) => `👥 ${item.parsed.y} nhân viên đi làm`
+            }
+          }
         },
         scales: {
-          y: { beginAtZero: true, ticks: { stepSize: 1 } }
+          x: {
+            grid: { display: false },
+            ticks: { color: "#94a3b8", font: { size: 11 } }
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { stepSize: 1, color: "#94a3b8", font: { size: 11 } },
+            grid: { color: "rgba(148, 163, 184, 0.1)" }
+          }
         }
       }
     })
