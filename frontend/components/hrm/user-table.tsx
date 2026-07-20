@@ -242,12 +242,16 @@ export function UserTable() {
             >
               Quản lý & HR
             </Button>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowResetModal(true)}>
-              <Building2 className="h-4 w-4" />Reset thiết bị
-            </Button>
-            <Button size="sm" className="gap-2" onClick={() => setShowAdd(true)}>
-              <Plus className="h-4 w-4" />Tạo tài khoản
-            </Button>
+            {(currentUser?.role === "admin" || currentUser?.role === "hr") && (
+              <>
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowResetModal(true)}>
+                  <Building2 className="h-4 w-4" />Reset thiết bị
+                </Button>
+                <Button size="sm" className="gap-2" onClick={() => setShowAdd(true)}>
+                  <Plus className="h-4 w-4" />Tạo tài khoản
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
