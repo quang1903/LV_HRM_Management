@@ -69,6 +69,8 @@ export function ContractTable() {
   const [editContract, setEditContract] = useState<Contract | null>(null)
   const [terminateContract, setTerminateContract] = useState<Contract | null>(null)
   const [showAdd, setShowAdd] = useState(false)
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 20
   const [newContract, setNewContract] = useState({
     employee_id: "", employee_search: "",
     contract_type: "Chinh thuc",
@@ -100,6 +102,9 @@ export function ContractTable() {
     const matchStatus = filterStatus ? displayStatus === filterStatus : true
     return matchSearch && matchStatus
   })
+
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
 
   const handleEdit = async () => {
     if (!editContract) return
@@ -198,7 +203,7 @@ export function ContractTable() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filtered.map((contract) => {
+              {paginated.map((contract) => {
                 const display = getDisplayStatus(contract.status, contract.end_date)
                 return (
                   <tr key={contract.id} className="transition-colors hover:bg-muted/40">
@@ -249,8 +254,21 @@ export function ContractTable() {
           </table>
         </div>
 
-        <div className="border-t border-border px-5 py-4 text-sm text-muted-foreground">
-          Hiển thị <span className="font-medium text-foreground">{filtered.length}</span> trong tổng số <span className="font-medium text-foreground">{contracts.length}</span> hợp đồng
+        <div className="border-t border-border px-5 py-4 flex items-center justify-between text-sm text-muted-foreground">
+          <span>Hiển thị <span className="font-medium text-foreground">{paginated.length}</span> / <span className="font-medium text-foreground">{filtered.length}</span> hợp đồng</span>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                className="rounded px-2 py-1 text-xs border border-input hover:bg-muted disabled:opacity-40">
+                ←
+              </button>
+              <span className="px-2 text-xs">{page} / {totalPages}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                className="rounded px-2 py-1 text-xs border border-input hover:bg-muted disabled:opacity-40">
+                →
+              </button>
+            </div>
+          )}
         </div>
       </Card>
 

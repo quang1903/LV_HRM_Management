@@ -1,12 +1,97 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import Chart from "chart.js/auto"
+import { attendanceService } from "@/services/attendance"
 import { exportToExcel } from "@/lib/exportExcel"
 import { Download, Users, Clock, FileText, TrendingUp, Loader2 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { reportService } from "@/services/report"
+
+function AttendanceBarChart({ data }: { data: { date: string; count: number }[] }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const chartRef = useRef<Chart | null>(null)
+
+  useEffect(() => {
+    if (!canvasRef.current || !data.length) return
+    if (chartRef.current) chartRef.current.destroy()
+    chartRef.current = new Chart(canvasRef.current, {
+      type: "bar",
+      data: {
+        labels: data.map(d => d.date.substring(5)),
+        datasets: [{
+          label: "Số nhân viên đi làm",
+          data: data.map(d => d.count),
+          backgroundColor: "rgba(59, 130, 246, 0.7)",
+          borderColor: "rgba(59, 130, 246, 1)",
+          borderWidth: 1,
+          borderRadius: 6,
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: { mode: "index" }
+        },
+        scales: {
+          y: { beginAtZero: true, ticks: { stepSize: 1 } }
+        }
+      }
+    })
+    return () => chartRef.current?.destroy()
+  }, [data])
+
+  return <canvas ref={canvasRef} />
+}
+
+function AttendanceDoughnutChart({ stats }: { stats: { dung_gio: number; di_tre: number; vang_mat: number; ve_som: number } }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const chartRef = useRef<Chart | null>(null)
+
+  useEffect(() => {
+    if (!canvasRef.current) return
+    if (chartRef.current) chartRef.current.destroy()
+    chartRef.current = new Chart(canvasRef.current, {
+      type: "doughnut",
+      data: {
+        labels: ["Đúng giờ", "Đi trễ", "Vắng mặt", "Về sớm"],
+        datasets: [{
+          data: [stats.dung_gio, stats.di_tre, stats.vang_mat, stats.ve_som],
+          backgroundColor: [
+            "rgba(34, 197, 94, 0.8)",
+            "rgba(249, 115, 22, 0.8)",
+            "rgba(239, 68, 68, 0.8)",
+            "rgba(59, 130, 246, 0.8)",
+          ],
+          borderWidth: 2,
+          borderColor: "#fff"
+        }]
+      },
+      options: {
+        responsive: true,
+        cutout: "65%",
+        plugins: {
+          legend: { position: "bottom", labels: { padding: 16, font: { size: 12 } } },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const total = ctx.dataset.data.reduce((a: number, b: number) => a + b, 0)
+                const pct = total ? ((ctx.parsed / total) * 100).toFixed(1) : 0
+                return ` ${ctx.label}: ${ctx.parsed} (${pct}%)`
+              }
+            }
+          }
+        }
+      }
+    })
+    return () => chartRef.current?.destroy()
+  }, [stats])
+
+  return <canvas ref={canvasRef} />
+}
 
 export function ReportsPanel() {
   const [activeTab, setActiveTab] = useState<"attendance" | "department" | "leave" | "contract">("attendance")
@@ -22,6 +107,36 @@ export function ReportsPanel() {
   const [loadingDepartment, setLoadingDepartment] = useState(false)
   const [loadingLeave, setLoadingLeave]           = useState(false)
   const [loadingContract, setLoadingContract]     = useState(false)
+
+  const [dailyData, setDailyData] = useState<{ date: string; count: number }[]>([])
+
+  const stats = {
+    dung_gio: attendanceData.reduce((sum, e) => sum + Number(e.on_time || 0), 0),
+    di_tre:   attendanceData.reduce((sum, e) => sum + Number(e.late || 0), 0),
+    vang_mat: attendanceData.reduce((sum, e) => sum + Number(e.absent || 0), 0),
+    ve_som:   attendanceData.reduce((sum, e) => sum + Number(e.early_leave || 0), 0),
+  }
+
+  useEffect(() => {
+    if (!attendanceData.length) {
+      setDailyData([])
+      return
+    }
+    attendanceService.getAll({ month, year })
+      .then(res => {
+        const grouped: Record<string, number> = {}
+        res.data.forEach((a: any) => {
+          if (a.status !== 'Vang mat') {
+            grouped[a.work_date] = (grouped[a.work_date] || 0) + 1
+          }
+        })
+        const sorted = Object.entries(grouped)
+          .map(([date, count]) => ({ date, count }))
+          .sort((a, b) => a.date.localeCompare(b.date))
+        setDailyData(sorted)
+      })
+      .catch(() => {})
+  }, [attendanceData, month, year])
 
   const totalEmployees   = departmentData.reduce((sum, d) => sum + Number(d.active || 0), 0)
   const totalAttDays     = attendanceData.reduce((sum, e) => sum + Number(e.total_days || 0), 0)
@@ -92,6 +207,24 @@ export function ReportsPanel() {
           value={year} onChange={e => setYear(Number(e.target.value))}>
           {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
         </select>
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 rounded-xl border border-border bg-background p-5">
+          <h3 className="text-sm font-semibold mb-4">Chấm công theo ngày</h3>
+          {dailyData.length > 0 
+            ? <AttendanceBarChart data={dailyData} />
+            : <p className="text-sm text-muted-foreground text-center py-8">Chưa có dữ liệu</p>
+          }
+        </div>
+        <div className="rounded-xl border border-border bg-background p-5">
+          <h3 className="text-sm font-semibold mb-4">Tỷ lệ chấm công</h3>
+          {stats && (stats.dung_gio + stats.di_tre + stats.vang_mat + stats.ve_som) > 0
+            ? <AttendanceDoughnutChart stats={stats} />
+            : <p className="text-sm text-muted-foreground text-center py-8">Chưa có dữ liệu</p>
+          }
+        </div>
       </div>
 
       {/* Tabs */}

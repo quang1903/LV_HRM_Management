@@ -85,6 +85,7 @@ export function LeaveTable() {
   const [leaves, setLeaves] = useState<LeaveRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  const [filterStatus, setFilterStatus] = useState("")
   const [page, setPage] = useState(1)
   const pageSize = 10
   const [viewLeave, setViewLeave] = useState<LeaveRequest | null>(null)
@@ -120,8 +121,9 @@ export function LeaveTable() {
     const matchSearch =
       l.full_name?.toLowerCase().includes(search.toLowerCase()) ||
       l.department_name?.toLowerCase().includes(search.toLowerCase())
-    if (user?.role === "employee") return l.employee_id === user.employee_id && matchSearch
-    return matchSearch
+    const matchStatus = filterStatus ? l.status === filterStatus : true
+    if (user?.role === "employee") return l.employee_id === user.employee_id && matchSearch && matchStatus
+    return matchSearch && matchStatus
   })
 
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
@@ -211,6 +213,13 @@ export function LeaveTable() {
                 className="h-9 w-full min-w-0 rounded-md border border-input bg-background pl-9 pr-3 text-sm outline-none focus:ring-2 ring-ring/40 md:w-56"
               />
             </div>
+            <select className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none"
+              value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setPage(1) }}>
+              <option value="">Tất cả trạng thái</option>
+              <option value="Cho duyet">Chờ duyệt</option>
+              <option value="Da duyet">Đã duyệt</option>
+              <option value="Tu choi">Từ chối</option>
+            </select>
             {canSubmit && (
               <Button size="sm" className="gap-2" onClick={() => setShowAdd(true)}>
                 <Plus className="h-4 w-4" />Gửi đơn

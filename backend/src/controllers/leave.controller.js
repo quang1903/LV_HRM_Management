@@ -128,6 +128,42 @@ export async function approveLeave(req, res) {
       "UPDATE leave_requests SET status='Da duyet', approved_by=?, approved_at=NOW() WHERE id=?",
       [req.user.id, req.params.id]
     )
+
+    // Đồng bộ chấm công — tạo bản ghi Vắng mặt cho từng ngày nghỉ
+    const [leaveRows] = await pool.execute(
+      "SELECT employee_id, start_date, end_date FROM leave_requests WHERE id = ?",
+      [req.params.id]
+    )
+    if (leaveRows.length > 0) {
+      const { employee_id, start_date, end_date } = leaveRows[0]
+      const current = new Date(start_date)
+      const end = new Date(end_date)
+      while (current <= end) {
+        if (current.getDay() !== 0) { // Bỏ qua Chủ nhật
+          const workDate = current.toISOString().split("T")[0]
+          // Kiểm tra đã có bản ghi chưa
+          const [existing] = await pool.execute(
+            "SELECT id FROM attendances WHERE employee_id = ? AND work_date = ?",
+            [employee_id, workDate]
+          )
+          if (existing.length === 0) {
+            // Chưa có → tạo mới Vắng mặt
+            await pool.execute(
+              "INSERT INTO attendances (employee_id, work_date, status) VALUES (?, ?, 'Vang mat')",
+              [employee_id, workDate]
+            )
+          } else {
+            // Đã có → cập nhật thành Vắng mặt
+            await pool.execute(
+              "UPDATE attendances SET status = 'Vang mat', check_in = NULL, check_out = NULL WHERE employee_id = ? AND work_date = ?",
+              [employee_id, workDate]
+            )
+          }
+        }
+        current.setDate(current.getDate() + 1)
+      }
+    }
+
     return res.json({ message: "Duyệt đơn thành công" })
   } catch (err) {
     return res.status(500).json({ message: "Lỗi server" })

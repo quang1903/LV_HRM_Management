@@ -51,6 +51,9 @@ export function AttendanceTable() {
   const [month, setMonth]             = useState(new Date().getMonth() + 1)
   const [year, setYear]               = useState(new Date().getFullYear())
   const [showAdd, setShowAdd]         = useState(false)
+  const [filterStatus, setFilterStatus] = useState("")
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 20
   const [editAttendance, setEditAttendance] = useState<Attendance | null>(null)
   const [newAttendance, setNewAttendance]   = useState({
     employee_id: "", work_date: "", check_in: "", check_out: "", status: "Dung gio"
@@ -85,9 +88,13 @@ export function AttendanceTable() {
       a.full_name?.toLowerCase().includes(search.toLowerCase()) ||
       a.department_name?.toLowerCase().includes(search.toLowerCase()) ||
       a.employee_code?.toLowerCase().includes(search.toLowerCase())
-    if (user?.role === "employee") return a.employee_id === user.employee_id && matchSearch
-    return matchSearch
+    const matchStatus = filterStatus ? a.status === filterStatus : true
+    if (user?.role === "employee") return a.employee_id === user.employee_id && matchSearch && matchStatus
+    return matchSearch && matchStatus
   })
+
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
 
   const handleEdit = async () => {
     if (!editAttendance) return
@@ -175,6 +182,14 @@ export function AttendanceTable() {
                 className="h-9 w-full min-w-0 rounded-md border border-input bg-background pl-9 pr-3 text-sm outline-none focus:ring-2 ring-ring/40 md:w-56"
               />
             </div>
+            <select className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none"
+              value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setPage(1) }}>
+              <option value="">Tất cả trạng thái</option>
+              <option value="Dung gio">Đúng giờ</option>
+              <option value="Di tre">Đi trễ</option>
+              <option value="Ve som">Về sớm</option>
+              <option value="Vang mat">Vắng mặt</option>
+            </select>
             {canEdit && (
               <Button size="sm" className="gap-2" onClick={() => setShowAdd(true)}>
                 <Plus className="h-4 w-4" />Thêm chấm công
@@ -198,7 +213,7 @@ export function AttendanceTable() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filtered.map((att) => (
+              {paginated.map((att) => (
                 <tr key={att.id} className="transition-colors hover:bg-muted/40">
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
@@ -235,8 +250,21 @@ export function AttendanceTable() {
           </table>
         </div>
 
-        <div className="border-t border-border px-5 py-4 text-sm text-muted-foreground">
-          Hiển thị <span className="font-medium text-foreground">{filtered.length}</span> trong tổng số <span className="font-medium text-foreground">{attendances.length}</span> bản ghi
+        <div className="border-t border-border px-5 py-4 flex items-center justify-between text-sm text-muted-foreground">
+          <span>Hiển thị <span className="font-medium text-foreground">{paginated.length}</span> / <span className="font-medium text-foreground">{filtered.length}</span> bản ghi</span>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                className="rounded px-2 py-1 text-xs border border-input hover:bg-muted disabled:opacity-40">
+                ←
+              </button>
+              <span className="px-2 text-xs">{page} / {totalPages}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                className="rounded px-2 py-1 text-xs border border-input hover:bg-muted disabled:opacity-40">
+                →
+              </button>
+            </div>
+          )}
         </div>
       </Card>
 
