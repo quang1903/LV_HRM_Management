@@ -28,15 +28,17 @@ type AuthContextType = {
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api").replace("/api", "")
 
 const PAGE_PERMISSIONS: Record<string, UserRole[]> = {
-  "/":            ["admin", "hr", "manager", "employee"],
-  "/employees":   ["admin", "hr", "manager"],
-  "/departments": ["admin", "hr"],
-  "/attendance":  ["admin", "hr", "manager", "employee"],
-  "/leave":       ["admin", "hr", "manager", "employee"],
-  "/contracts":   ["admin", "hr", "manager"],
-  "/reports":     ["admin", "hr", "manager"],
-  "/users":       ["admin", "hr", "manager"],
-  "/profile":     ["admin", "hr", "manager", "employee"],
+  "/":                 ["admin", "hr", "manager", "employee"],
+  "/employees":        ["admin", "hr", "manager"],
+  "/departments":      ["admin", "hr"],
+  "/positions":        ["admin", "hr"],
+  "/attendance":       ["admin", "hr", "manager", "employee"],
+  "/leave":            ["admin", "hr", "manager", "employee"],
+  "/contracts":        ["admin", "hr", "manager"],
+  "/reports":          ["admin", "hr", "manager"],
+  "/users":            ["admin", "hr", "manager"],
+  "/settings":         ["admin", "hr"],
+  "/profile":          ["admin", "hr", "manager", "employee"],
   "/profile-requests": ["admin", "hr"],
 }
 

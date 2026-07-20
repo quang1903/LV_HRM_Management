@@ -2,15 +2,18 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 const ROLE_PERMISSIONS: Record<string, string[]> = {
-  "/employees":   ["admin", "hr", "manager"],
-  "/departments": ["admin", "hr"],
-  "/positions":   ["admin", "hr"],
-  "/contracts":   ["admin", "hr", "manager"],
-  "/reports":     ["admin", "hr", "manager"],
-  "/attendance":  ["admin", "hr", "manager", "employee"],
-  "/leave":       ["admin", "hr", "manager", "employee"],
-  "/users":       ["admin", "hr", "manager"],
-  "/":            ["admin", "hr", "manager", "employee"],
+  "/":                 ["admin", "hr", "manager", "employee"],
+  "/employees":        ["admin", "hr", "manager"],
+  "/departments":      ["admin", "hr"],
+  "/positions":        ["admin", "hr"],
+  "/contracts":        ["admin", "hr", "manager"],
+  "/reports":          ["admin", "hr", "manager"],
+  "/attendance":       ["admin", "hr", "manager", "employee"],
+  "/leave":            ["admin", "hr", "manager", "employee"],
+  "/users":            ["admin", "hr", "manager"],
+  "/settings":         ["admin", "hr"],
+  "/profile":          ["admin", "hr", "manager", "employee"],
+  "/profile-requests": ["admin", "hr"],
 }
 
 export function middleware(request: NextRequest) {
