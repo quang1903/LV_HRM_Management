@@ -75,7 +75,7 @@ export async function updateDepartment(req, res) {
 
       // Tự động gán chức vụ Trưởng phòng cho người mới
       const [leaderPos] = await conn.execute(
-        "SELECT id FROM positions WHERE department_id = ? AND name LIKE 'Truong phong%' LIMIT 1",
+        "SELECT id FROM positions WHERE department_id = ? AND name LIKE 'Trưởng phòng%' LIMIT 1",
         [req.params.id]
       )
       if (leaderPos.length > 0) {
@@ -105,7 +105,7 @@ export async function updateDepartment(req, res) {
 
       // Tự động bỏ chức vụ Trưởng phòng của người cũ — tìm chức vụ thường của phòng đó
       const [normalPos] = await conn.execute(
-        "SELECT id FROM positions WHERE department_id = ? AND name NOT LIKE 'Truong phong%' LIMIT 1",
+        "SELECT id FROM positions WHERE department_id = ? AND name NOT LIKE 'Trưởng phòng%' LIMIT 1",
         [req.params.id]
       )
       if (normalPos.length > 0) {

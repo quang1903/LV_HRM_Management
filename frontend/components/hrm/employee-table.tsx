@@ -378,7 +378,7 @@ export function EmployeeTable() {
         "Họ và tên": "Nguyen Van Mau",
         "Email": "mau.nguyen@hrm.com",
         "Ngày vào làm": "2026-01-15",
-        "Phòng ban": departments[0]?.name || "Ky thuat",
+        "Phòng ban": departments[0]?.name || "Kỹ thuật",
         "Chức vụ": "",
         "Số điện thoại": "0901234567",
         "Ngày sinh": "1998-05-20",

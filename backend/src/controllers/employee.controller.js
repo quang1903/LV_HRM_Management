@@ -160,7 +160,7 @@ export async function updateEmployee(req, res) {
     if (position_id) {
       const [posRows] = await pool.execute("SELECT name, department_id FROM positions WHERE id = ?", [position_id])
       if (posRows.length > 0) {
-        const isLeader = posRows[0].name.toLowerCase().includes("truong phong")
+        const isLeader = posRows[0].name.toLowerCase().includes("trưởng phòng")
         const empDeptId = posRows[0].department_id
 
         if (isLeader && empDeptId) {
@@ -386,7 +386,7 @@ export async function importEmployees(req, res) {
               if (!position_id) {
                 const leaderPos = allPositions.find(p =>
                   p.department_id === department_id &&
-                  p.name.toLowerCase().includes("truong phong")
+                  p.name.toLowerCase().includes("trưởng phòng")
                 )
                 if (leaderPos) {
                   await pool.execute("UPDATE employees SET position_id = ? WHERE id = ?", [leaderPos.id, employeeId])

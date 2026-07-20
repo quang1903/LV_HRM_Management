@@ -12,6 +12,7 @@ const pool = mysql.createPool({
   dateStrings: true,
   waitForConnections: true,
   connectionLimit: 3,
+  charset: 'utf8mb4',
 })
 
 try {
