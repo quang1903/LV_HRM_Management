@@ -72,6 +72,18 @@ export async function updateDepartment(req, res) {
         await conn.execute("UPDATE users SET role = 'manager' WHERE employee_id = ?", [newManagerId])
         warningMessage += " Đã tự động nâng quyền tài khoản Trưởng phòng mới lên Quản lý."
       }
+
+      // Tự động gán chức vụ Trưởng phòng cho người mới
+      const [leaderPos] = await conn.execute(
+        "SELECT id FROM positions WHERE department_id = ? AND name LIKE 'Truong phong%' LIMIT 1",
+        [req.params.id]
+      )
+      if (leaderPos.length > 0) {
+        await conn.execute(
+          "UPDATE employees SET position_id = ? WHERE id = ?",
+          [leaderPos[0].id, newManagerId]
+        )
+      }
     }
 
     // Nếu đổi qua người khác, kiểm tra hạ role người cũ
@@ -89,6 +101,18 @@ export async function updateDepartment(req, res) {
           await conn.execute("UPDATE users SET role = 'employee' WHERE employee_id = ?", [oldManagerId])
           warningMessage += " Đã tự động hạ quyền tài khoản Trưởng phòng cũ về Nhân viên (không còn quản lý phòng nào)."
         }
+      }
+
+      // Tự động bỏ chức vụ Trưởng phòng của người cũ — tìm chức vụ thường của phòng đó
+      const [normalPos] = await conn.execute(
+        "SELECT id FROM positions WHERE department_id = ? AND name NOT LIKE 'Truong phong%' LIMIT 1",
+        [req.params.id]
+      )
+      if (normalPos.length > 0) {
+        await conn.execute(
+          "UPDATE employees SET position_id = ? WHERE id = ?",
+          [normalPos[0].id, oldManagerId]
+        )
       }
     }
 

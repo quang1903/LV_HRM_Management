@@ -142,6 +142,31 @@ export async function updateEmployee(req, res) {
 
     await pool.execute("UPDATE users SET email = ? WHERE employee_id = ?", [email, req.params.id])
 
+    // Kiểm tra chức vụ mới có phải Trưởng phòng không
+    if (position_id) {
+      const [posRows] = await pool.execute("SELECT name, department_id FROM positions WHERE id = ?", [position_id])
+      if (posRows.length > 0) {
+        const isLeader = posRows[0].name.toLowerCase().includes("truong phong")
+        const empDeptId = posRows[0].department_id
+
+        if (isLeader && empDeptId) {
+          // Nâng role lên manager + gán manager_id
+          await pool.execute("UPDATE users SET role = 'manager' WHERE employee_id = ?", [req.params.id])
+          const [deptRows] = await pool.execute("SELECT manager_id FROM departments WHERE id = ?", [empDeptId])
+          if (deptRows.length > 0 && !deptRows[0].manager_id) {
+            await pool.execute("UPDATE departments SET manager_id = ? WHERE id = ?", [req.params.id, empDeptId])
+          }
+        } else {
+          // Hạ role về employee + bỏ manager_id nếu đang là trưởng phòng
+          const [userRows] = await pool.execute("SELECT role FROM users WHERE employee_id = ?", [req.params.id])
+          if (userRows.length > 0 && userRows[0].role === "manager") {
+            await pool.execute("UPDATE users SET role = 'employee' WHERE employee_id = ?", [req.params.id])
+            await pool.execute("UPDATE departments SET manager_id = NULL WHERE manager_id = ?", [req.params.id])
+          }
+        }
+      }
+    }
+
     return res.json({ message: "Cập nhật nhân viên thành công" })
   } catch (err) {
     return res.status(500).json({ message: "Lỗi server" })
@@ -342,6 +367,17 @@ export async function importEmployees(req, res) {
             )
             if (deptRows.length > 0 && !deptRows[0].manager_id) {
               await pool.execute("UPDATE departments SET manager_id = ? WHERE id = ?", [employeeId, department_id])
+              
+              // Đồng bộ position_id sang chức vụ Trưởng phòng
+              if (!position_id) {
+                const leaderPos = allPositions.find(p => 
+                  p.department_id === department_id && 
+                  p.name.toLowerCase().includes("truong phong")
+                )
+                if (leaderPos) {
+                  await pool.execute("UPDATE employees SET position_id = ? WHERE id = ?", [leaderPos.id, employeeId])
+                }
+              }
             } else {
               finalRole = "employee"
               const currentManagerName = deptRows[0]?.current_manager_name || "không xác định"
