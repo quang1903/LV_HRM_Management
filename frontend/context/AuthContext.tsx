@@ -28,24 +28,24 @@ type AuthContextType = {
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api").replace("/api", "")
 
 const PAGE_PERMISSIONS: Record<string, UserRole[]> = {
-  "/":                 ["admin", "hr", "manager", "employee"],
-  "/employees":        ["admin", "hr", "manager"],
-  "/departments":      ["admin", "hr"],
-  "/positions":        ["admin", "hr"],
-  "/attendance":       ["admin", "hr", "manager", "employee"],
-  "/leave":            ["admin", "hr", "manager", "employee"],
-  "/contracts":        ["admin", "hr", "manager"],
-  "/reports":          ["admin", "hr", "manager"],
-  "/users":            ["admin", "hr", "manager"],
-  "/settings":         ["admin", "hr"],
-  "/profile":          ["admin", "hr", "manager", "employee"],
+  "/": ["admin", "hr", "manager", "employee"],
+  "/employees": ["admin", "hr", "manager"],
+  "/departments": ["admin", "hr"],
+  "/positions": ["admin", "hr"],
+  "/attendance": ["admin", "hr", "manager", "employee"],
+  "/leave": ["admin", "hr", "manager", "employee"],
+  "/contracts": ["admin", "hr", "manager"],
+  "/reports": ["admin", "hr", "manager"],
+  "/users": ["admin", "hr"],
+  "/settings": ["admin", "hr"],
+  "/profile": ["admin", "hr", "manager", "employee"],
   "/profile-requests": ["admin", "hr"],
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser]           = useState<User | null>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
@@ -72,9 +72,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       const data = await res.json()
       if (!res.ok) return { success: false, error: data.message || "Đăng nhập thất bại" }
-      localStorage.setItem("hrm_access_token",  data.accessToken)
+      localStorage.setItem("hrm_access_token", data.accessToken)
       localStorage.setItem("hrm_refresh_token", data.refreshToken)
-      localStorage.setItem("hrm_user",          JSON.stringify(data.user))
+      localStorage.setItem("hrm_user", JSON.stringify(data.user))
       document.cookie = `hrm_user=${encodeURIComponent(JSON.stringify(data.user))}; path=/; max-age=86400`
       setUser(data.user)
       return { success: true }
@@ -91,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken }),
       })
-    } catch {}
+    } catch { }
     finally {
       setUser(null)
       localStorage.removeItem("hrm_user")

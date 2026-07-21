@@ -12,18 +12,18 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/context/AuthContext"
 
 const mainMenu = [
-  { key: "dashboard",        label: "Dashboard",         icon: LayoutDashboard, href: "/",                group: "main" },
-  { key: "employees",        label: "Nhân viên",         icon: Users,           href: "/employees",       group: "main" },
-  { key: "departments",      label: "Phòng ban",         icon: Building2,       href: "/departments",     group: "main" },
-  { key: "attendance",       label: "Chấm công",         icon: Clock,           href: "/attendance",      group: "main" },
-  { key: "leave",            label: "Nghỉ phép",         icon: CalendarDays,    href: "/leave",           group: "main" },
-  { key: "contracts",        label: "Hợp đồng",          icon: FileText,        href: "/contracts",       group: "main" },
-  { key: "positions",        label: "Chức vụ",            icon: Briefcase,       href: "/positions",       group: "admin" },
-  { key: "reports",          label: "Báo cáo",           icon: BarChart3,       href: "/reports",         group: "admin" },
-  { key: "users",            label: "Người dùng",        icon: Shield,          href: "/users",           group: "admin" },
-  { key: "settings",         label: "Cài đặt",           icon: Settings,        href: "/settings",        group: "admin" },
-  { key: "profile-requests", label: "Yêu cầu thay đổi", icon: ClipboardCheck,  href: "/profile-requests",group: "admin" },
-  { key: "profile",          label: "Trang cá nhân",     icon: UserCircle,      href: "/profile",         group: "admin" },
+  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/", group: "main" },
+  { key: "employees", label: "Nhân viên", icon: Users, href: "/employees", group: "main" },
+  { key: "departments", label: "Phòng ban", icon: Building2, href: "/departments", group: "main" },
+  { key: "attendance", label: "Chấm công", icon: Clock, href: "/attendance", group: "main" },
+  { key: "leave", label: "Nghỉ phép", icon: CalendarDays, href: "/leave", group: "main" },
+  { key: "contracts", label: "Hợp đồng", icon: FileText, href: "/contracts", group: "main" },
+  { key: "positions", label: "Chức vụ", icon: Briefcase, href: "/positions", group: "admin" },
+  { key: "reports", label: "Báo cáo", icon: BarChart3, href: "/reports", group: "admin" },
+  { key: "users", href: "/users", label: "Người dùng", icon: Users, roles: ["admin", "hr"], group: "admin" },
+  { key: "settings", label: "Cài đặt", icon: Settings, href: "/settings", group: "admin" },
+  { key: "profile-requests", label: "Yêu cầu thay đổi", icon: ClipboardCheck, href: "/profile-requests", group: "admin" },
+  { key: "profile", label: "Trang cá nhân", icon: UserCircle, href: "/profile", group: "admin" },
 ]
 
 function getInitials(name: string) {
@@ -31,9 +31,9 @@ function getInitials(name: string) {
 }
 
 const roleLabel: Record<string, string> = {
-  admin:    "Quản trị viên",
-  hr:       "Nhân sự",
-  manager:  "Quản lý",
+  admin: "Quản trị viên",
+  hr: "Nhân sự",
+  manager: "Quản lý",
   employee: "Nhân viên",
 }
 
@@ -49,7 +49,7 @@ export function Sidebar() {
   }, [])
 
   const visibleMenu = mainMenu.filter(item => hasPermission(item.href))
-  const mainItems  = visibleMenu.filter(i => i.group === "main")
+  const mainItems = visibleMenu.filter(i => i.group === "main")
   const adminItems = visibleMenu.filter(i => i.group === "admin")
 
   const content = (

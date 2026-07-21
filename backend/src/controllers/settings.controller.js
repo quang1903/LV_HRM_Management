@@ -2,7 +2,9 @@ import pool from "../config/db.js"
 
 export async function getSettings(req, res) {
   try {
-    const [rows] = await pool.execute("SELECT * FROM settings WHERE id = 1")
+    const [rows] = await pool.execute(
+      "SELECT company_lat, company_lng, max_distance, device_lock_enabled FROM settings WHERE id = 1"
+    )
     if (rows.length === 0) {
       return res.json({ company_lat: null, company_lng: null, max_distance: 500, device_lock_enabled: 0 })
     }
