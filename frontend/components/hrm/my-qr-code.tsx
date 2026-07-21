@@ -15,15 +15,24 @@ export function MyQRCode() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expired, setExpired] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [fetchCount, setFetchCount] = useState(0)
   const intervalRef = useRef<any>(null)
 
-  const fetchQR = async () => {
+  const fetchQR = async (isManual = false) => {
+    if (isManual) {
+      if (refreshing) return
+      setRefreshing(true)
+      setTimeout(() => setRefreshing(false), 3000)
+    }
+    if (intervalRef.current) clearInterval(intervalRef.current)
     try {
       setExpired(false)
       const res = await employeeService.getMyQR()
       const dataUrl = await QRCode.toDataURL(res.data.qr_value, { width: 220, margin: 1 })
       setQrImage(dataUrl)
-      setSecondsLeft(res.data.expires_in)
+      setSecondsLeft(30)
+      setFetchCount(prev => prev + 1)
       setError(null)
     } catch (err: any) {
       setError(err.response?.data?.message || "Không thể tạo mã QR")
@@ -38,37 +47,29 @@ export function MyQRCode() {
       setError("Tài khoản chưa gắn với hồ sơ nhân viên, không có mã QR chấm công")
       return
     }
+    fetchQR(false)
+  }, [user])
 
-    fetchQR()
+  useEffect(() => {
+    if (!qrImage || expired) return
     intervalRef.current = setInterval(() => {
       setSecondsLeft(prev => {
         if (prev <= 1) {
-          clearInterval(intervalRef.current)
-          setExpired(true)
+          fetchQR(false)
           return 0
         }
         return prev - 1
       })
     }, 1000)
-    return () => clearInterval(intervalRef.current)
-  }, [user])
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
+  }, [qrImage, expired, fetchCount])
 
   const handleRefresh = () => {
+    if (refreshing || loading) return
     setLoading(true)
-    fetchQR().finally(() => {
-      // Khởi động lại đồng hồ đếm ngược
-      clearInterval(intervalRef.current)
-      intervalRef.current = setInterval(() => {
-        setSecondsLeft(prev => {
-          if (prev <= 1) {
-            clearInterval(intervalRef.current)
-            setExpired(true)
-            return 0
-          }
-          return prev - 1
-        })
-      }, 1000)
-    })
+    fetchQR(true)
   }
 
   return (
@@ -124,6 +125,14 @@ export function MyQRCode() {
         <p className="text-xs text-muted-foreground text-center mt-3">
           Đưa mã này lên camera máy chấm công tại cổng. Mã tự hết hạn sau 30 giây để bảo mật.
         </p>
+      )}
+      {!error && !expired && !loading && !refreshing && (
+        <button
+          onClick={handleRefresh}
+          className="mt-2 w-full rounded-lg border border-input bg-background px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
+        >
+          🔄 Tạo mã mới
+        </button>
       )}
     </Card>
   )

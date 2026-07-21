@@ -68,7 +68,7 @@ export default function ScanPage() {
     scannerRef.current = scanner
     scanner.start(
       { facingMode: "environment" },
-      { fps: 10, qrbox: 250 },
+      { fps: 10, qrbox: { width: 500, height: 500 } },
       onScanSuccess,
       () => {}
     ).then(() => setScanning(true)).catch(err => {
@@ -207,7 +207,7 @@ export default function ScanPage() {
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-2xl">
         <div className="flex items-center justify-center gap-3 mb-6 text-white">
           <div className="flex h-12 w-12 items-center justify-center rounded-md bg-primary">
             <Briefcase className="h-6 w-6" />
@@ -218,7 +218,7 @@ export default function ScanPage() {
           </div>
         </div>
 
-        <div className="bg-black rounded-lg overflow-hidden aspect-square relative">
+        <div className="bg-black rounded-lg overflow-hidden w-full relative" style={{ height: "600px" }} >
           <div id="qr-reader" className="w-full h-full" />
           {!scanning && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50">

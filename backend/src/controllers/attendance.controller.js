@@ -207,7 +207,11 @@ export async function checkOut(req, res) {
     if (existing.length === 0) return res.status(400).json({ message: "Không tìm thấy bản ghi check-in hợp lệ để check-out" })
     const now = new Date()
     const checkInTime = new Date(existing[0].check_in)
-    const work_minutes = Math.round((now - checkInTime) / 60000)
+    const diffMinutes = (now - checkInTime) / 60000
+    if (diffMinutes < 0.05) {
+      return res.status(400).json({ message: "Bạn vừa check-in, vui lòng chờ ít nhất 3 giây trước khi check-out" })
+    }
+    const work_minutes = Math.round(diffMinutes)
     await pool.execute("UPDATE attendances SET check_out=?, work_minutes=? WHERE id=?", [now, work_minutes, existing[0].id])
     return res.json({ message: "Check-out thành công", full_name: employee.full_name, check_out: now, work_minutes })
   } catch (err) {
