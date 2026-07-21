@@ -31,7 +31,7 @@ export function MyQRCode() {
       const res = await employeeService.getMyQR()
       const dataUrl = await QRCode.toDataURL(res.data.qr_value, { width: 220, margin: 1 })
       setQrImage(dataUrl)
-      setSecondsLeft(res.data.expires_in)
+      setSecondsLeft(30)
       setFetchCount(prev => prev + 1)
       setError(null)
     } catch (err: any) {

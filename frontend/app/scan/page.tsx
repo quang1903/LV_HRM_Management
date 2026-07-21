@@ -116,6 +116,7 @@ export default function ScanPage() {
       setHistory(prev => [{ name: res.data.full_name, time: `Vào ${time}` }, ...prev].slice(0, 8))
       scannerRef.current?.pause(true)
       setTimeout(() => scannerRef.current?.resume(), 3000)
+      setTimeout(() => setResult(null), 2000)
     } catch (err: any) {
       const msg = err.response?.data?.message || ""
       if (msg.includes("đã check-in")) {
@@ -127,12 +128,14 @@ export default function ScanPage() {
           setHistory(prev => [{ name: res2.data.full_name, time: `Ra ${time}` }, ...prev].slice(0, 8))
           scannerRef.current?.pause(true)
           setTimeout(() => scannerRef.current?.resume(), 3000)
+          setTimeout(() => setResult(null), 2000)
         } catch (err2: any) {
           const msg2 = err2.response?.data?.message || ""
           if (msg2.includes("đã check-out") || msg2.includes("điểm danh")) {
             setResult({ message: `Đã điểm danh đủ hôm nay`, success: true, name: "" })
             scannerRef.current?.pause(true)
             setTimeout(() => scannerRef.current?.resume(), 3000)
+            setTimeout(() => setResult(null), 2000)
           } else if (err2.response?.status === 401) {
             localStorage.removeItem(TERMINAL_TOKEN_KEY)
             setTerminalToken(null)
@@ -141,6 +144,7 @@ export default function ScanPage() {
             setResult({ message: "Đã điểm danh đủ hôm nay", success: true, name: "" })
             scannerRef.current?.pause(true)
             setTimeout(() => scannerRef.current?.resume(), 3000)
+            setTimeout(() => setResult(null), 2000)
           } else {
             setResult({ message: msg2 || "Lỗi xử lý", success: false })
           }
