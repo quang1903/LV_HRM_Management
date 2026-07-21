@@ -112,8 +112,10 @@ export default function ScanPage() {
       const res = await axios.post(`${API_URL}/attendances/checkin`, 
         { qr_value: decodedText, latitude, longitude }, { headers })
       const time = new Date(res.data.check_in).toLocaleTimeString("vi-VN")
-      setResult({ message: `Check-in lúc ${time}`, success: true, name: res.data.full_name })
+      setResult({ message: `Đã vào lúc ${time}`, success: true, name: res.data.full_name })
       setHistory(prev => [{ name: res.data.full_name, time: `Vào ${time}` }, ...prev].slice(0, 8))
+      scannerRef.current?.pause(true)
+      setTimeout(() => scannerRef.current?.resume(), 3000)
     } catch (err: any) {
       const msg = err.response?.data?.message || ""
       if (msg.includes("đã check-in")) {
@@ -121,17 +123,27 @@ export default function ScanPage() {
           const res2 = await axios.post(`${API_URL}/attendances/checkout`, 
             { qr_value: decodedText, latitude, longitude }, { headers })
           const time = new Date(res2.data.check_out).toLocaleTimeString("vi-VN")
-          setResult({ message: `Check-out lúc ${time}`, success: true, name: res2.data.full_name })
+          setResult({ message: `Đã ra lúc ${time}`, success: true, name: res2.data.full_name })
           setHistory(prev => [{ name: res2.data.full_name, time: `Ra ${time}` }, ...prev].slice(0, 8))
+          scannerRef.current?.pause(true)
+          setTimeout(() => scannerRef.current?.resume(), 3000)
         } catch (err2: any) {
           const msg2 = err2.response?.data?.message || ""
-          // Token hết hạn
-          if (err2.response?.status === 401) {
+          if (msg2.includes("đã check-out") || msg2.includes("điểm danh")) {
+            setResult({ message: `Đã điểm danh đủ hôm nay`, success: true, name: "" })
+            scannerRef.current?.pause(true)
+            setTimeout(() => scannerRef.current?.resume(), 3000)
+          } else if (err2.response?.status === 401) {
             localStorage.removeItem(TERMINAL_TOKEN_KEY)
             setTerminalToken(null)
             setShowActivate(true)
+          } else if (msg2.includes("check-in hợp lệ")) {
+            setResult({ message: "Đã điểm danh đủ hôm nay", success: true, name: "" })
+            scannerRef.current?.pause(true)
+            setTimeout(() => scannerRef.current?.resume(), 3000)
+          } else {
+            setResult({ message: msg2 || "Lỗi xử lý", success: false })
           }
-          setResult({ message: msg2 || "Lỗi xử lý", success: false })
         }
       } else if (err.response?.status === 401) {
         // Token hết hạn hoặc không hợp lệ

@@ -31,7 +31,7 @@ export async function getAttendances(req, res) {
       query += " AND e.department_id = ?"
       params.push(department_id)
     }
-    query += " ORDER BY a.work_date DESC, e.full_name ASC"
+    query += " ORDER BY a.work_date DESC, a.check_in DESC"
     const [rows] = await pool.execute(query, params)
     return res.json(rows)
   } catch (err) {

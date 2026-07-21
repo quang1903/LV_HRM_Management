@@ -228,7 +228,11 @@ export function AttendanceTable() {
                   <td className="px-5 py-4 font-medium">{att.check_in ? att.check_in.substring(11, 16) : "—"}</td>
                   <td className="px-5 py-4 font-medium">{att.check_out ? att.check_out.substring(11, 16) : "—"}</td>
                   <td className="px-5 py-4 text-muted-foreground">
-                    {att.work_minutes ? `${Math.floor(att.work_minutes / 60)}h${att.work_minutes % 60 > 0 ? `${att.work_minutes % 60}p` : ""}` : "—"}
+                    {att.check_out
+                      ? att.work_minutes < 1
+                        ? "< 1 phút"
+                        : `${Math.floor(att.work_minutes / 60)}h${att.work_minutes % 60 > 0 ? `${att.work_minutes % 60}p` : ""}`
+                      : "—"}
                   </td>
                   <td className="px-5 py-4">
                     <span className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset", statusStyles[att.status] || "bg-slate-100 text-slate-600")}>

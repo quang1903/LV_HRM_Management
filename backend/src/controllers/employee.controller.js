@@ -166,13 +166,13 @@ export async function updateEmployee(req, res) {
         if (isLeader && empDeptId) {
           // Nâng role lên manager
           await pool.execute("UPDATE users SET role = 'manager' WHERE employee_id = ?", [req.params.id])
-          
+
           // Xóa manager_id ở phòng ban cũ nếu có
           await pool.execute(
             "UPDATE departments SET manager_id = NULL WHERE manager_id = ? AND id != ?",
             [req.params.id, empDeptId]
           )
-          
+
           // Gán manager_id cho phòng ban mới
           await pool.execute("UPDATE departments SET manager_id = ? WHERE id = ?", [req.params.id, empDeptId])
         } else {
