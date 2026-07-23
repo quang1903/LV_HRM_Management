@@ -145,7 +145,8 @@ export async function resetPassword(req, res) {
     const { password } = req.body
     if (!password) return res.status(400).json({ message: "Vui lòng nhập mật khẩu mới" })
     const hashed = await bcrypt.hash(password, 10)
-    await pool.execute("UPDATE users SET password = ? WHERE id = ?", [hashed, req.params.id])
+    const [result] = await pool.execute("UPDATE users SET password = ? WHERE id = ?", [hashed, req.params.id])
+    if (result.affectedRows === 0) return res.status(404).json({ message: "Không tìm thấy tài khoản" })
     return res.json({ message: "Đặt lại mật khẩu thành công" })
   } catch (err) {
     console.error(err)
@@ -155,7 +156,8 @@ export async function resetPassword(req, res) {
 
 export async function resetDevice(req, res) {
   try {
-    await pool.execute("UPDATE users SET device_id = NULL WHERE id = ?", [req.params.id])
+    const [result] = await pool.execute("UPDATE users SET device_id = NULL WHERE id = ?", [req.params.id])
+    if (result.affectedRows === 0) return res.status(404).json({ message: "Không tìm thấy tài khoản" })
     return res.json({ message: "Đã reset thiết bị, nhân viên có thể đăng nhập lại từ máy mới" })
   } catch (err) {
     return res.status(500).json({ message: "Lỗi server" })

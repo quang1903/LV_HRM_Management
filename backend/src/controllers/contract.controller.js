@@ -93,6 +93,18 @@ export async function renewContract(req, res) {
       return res.status(400).json({ message: "Không thể gia hạn hợp đồng cho nhân viên đã nghỉ việc" })
     }
 
+    if (existing[0].status === 'Da cham dut') {
+      return res.status(400).json({ message: "Hợp đồng đã chấm dứt không thể gia hạn, vui lòng tạo hợp đồng mới" })
+    }
+    // Kiểm tra nhân viên đã có HĐ hiệu lực khác chưa
+    const [activeContracts] = await pool.execute(
+      "SELECT id FROM contracts WHERE employee_id = ? AND status = 'Dang hieu luc' AND id != ?",
+      [existing[0].employee_id, req.params.id]
+    )
+    if (activeContracts.length > 0) {
+      return res.status(400).json({ message: "Nhân viên đã có hợp đồng đang hiệu lực, không thể gia hạn hợp đồng cũ" })
+    }
+
     if (new Date(end_date) <= new Date(existing[0].start_date)) {
       return res.status(400).json({ message: "Ngày kết thúc phải sau ngày bắt đầu hợp đồng" })
     }

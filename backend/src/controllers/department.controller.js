@@ -149,6 +149,10 @@ export async function deleteDepartment(req, res) {
     const [employees] = await pool.execute("SELECT id FROM employees WHERE department_id = ?", [req.params.id])
     if (employees.length > 0) return res.status(400).json({ message: "Phòng ban đang có nhân viên, không thể xóa" })
 
+    await pool.execute(
+      "UPDATE employees SET position_id = NULL WHERE position_id IN (SELECT id FROM positions WHERE department_id = ?)",
+      [req.params.id]
+    )
     await pool.execute("DELETE FROM positions WHERE department_id = ?", [req.params.id])
     await pool.execute("DELETE FROM departments WHERE id = ?", [req.params.id])
     return res.json({ message: "Xóa phòng ban thành công" })

@@ -100,6 +100,7 @@ export async function updatePosition(req, res) {
         if (otherDepts.length === 0) {
           await pool.execute("UPDATE users SET role = 'employee' WHERE employee_id = ?", [emp.id])
         }
+        await pool.execute("UPDATE departments SET manager_id = NULL WHERE manager_id = ?", [emp.id])
       }
     }
 

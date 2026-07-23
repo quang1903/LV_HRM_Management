@@ -79,7 +79,7 @@ export function LeaveTable() {
   const { user } = useAuth()
   const isHRorAdmin = user?.role === "admin" || user?.role === "hr"
   const isManager = user?.role === "manager"
-  const canApprove = user?.role === "admin" || user?.role === "manager"
+  const canApprove = user?.role === "admin" || user?.role === "hr" || user?.role === "manager"
   const canSubmit = !!user?.employee_id
 
   const [leaves, setLeaves] = useState<LeaveRequest[]>([])
@@ -273,7 +273,7 @@ export function LeaveTable() {
                       <button type="button" onClick={() => setViewLeave(leave)} className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground">
                         <Eye className="h-4 w-4" />
                       </button>
-                      {canApprove && leave.status === "Cho duyet" && (
+                      {canApprove && leave.status === "Cho duyet" && leave.employee_id !== user?.employee_id && (
                         <>
                           <button type="button" onClick={() => handleApprove(leave.id)} className="rounded-md px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-50">
                             Duyệt
@@ -337,7 +337,7 @@ export function LeaveTable() {
                 ))}
               </div>
               <div className="flex gap-2 mt-4">
-                {canApprove && viewLeave.status === "Cho duyet" && (
+                {canApprove && viewLeave.status === "Cho duyet" && viewLeave.employee_id !== user?.employee_id && (
                   <>
                     <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" onClick={() => handleApprove(viewLeave.id)}>Duyệt</Button>
                     <Button variant="destructive" className="flex-1" onClick={() => { setRejectModal({ id: viewLeave.id }); setRejectReason("") }}>Từ chối</Button>

@@ -142,6 +142,10 @@ export async function updateAttendance(req, res) {
     const checkInFormatted = formatTime(check_in, work_date)
     const checkOutFormatted = formatTime(check_out, work_date)
 
+    if (check_in && check_out && checkOutFormatted <= checkInFormatted) {
+      return res.status(400).json({ message: "Giờ ra (check-out) phải lớn hơn giờ vào (check-in)" })
+    }
+
     let work_minutes = 0
     if (check_in && check_out) {
       const parseTime = (t) => {

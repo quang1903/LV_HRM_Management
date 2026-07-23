@@ -5,8 +5,9 @@ dotenv.config()
 export async function getAttendanceReport(req, res) {
   try {
     const { month, year } = req.query
-    const m = month || new Date().getMonth() + 1
-    const y = year  || new Date().getFullYear()
+    const nowVN = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" }))
+    const m = month || (nowVN.getMonth() + 1)
+    const y = year  || nowVN.getFullYear()
 
     const params = [m, y]
     if (req.user.role === 'manager') {
@@ -70,8 +71,9 @@ export async function getDepartmentReport(req, res) {
 export async function getLeaveReport(req, res) {
   try {
     const { month, year } = req.query
-    const m = month || new Date().getMonth() + 1
-    const y = year  || new Date().getFullYear()
+    const nowVN = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" }))
+    const m = month || (nowVN.getMonth() + 1)
+    const y = year  || nowVN.getFullYear()
 
     const params = [m, y]
     if (req.user.role === 'manager') {
