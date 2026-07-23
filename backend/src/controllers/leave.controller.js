@@ -42,6 +42,19 @@ export async function getLeaveById(req, res) {
       WHERE l.id = ?
     `, [req.params.id])
     if (rows.length === 0) return res.status(404).json({ message: "Không tìm thấy đơn nghỉ phép" })
+
+    const isSelf = rows[0].employee_id === req.user.employee_id
+    if (req.user.role === 'employee' && !isSelf) {
+      return res.status(403).json({ message: "Không có quyền xem đơn này" })
+    }
+    if (req.user.role === 'manager' && !isSelf) {
+      const [dept] = await pool.execute(
+        "SELECT id FROM departments WHERE id = (SELECT department_id FROM employees WHERE id = ?) AND manager_id = ?",
+        [rows[0].employee_id, req.user.employee_id]
+      )
+      if (dept.length === 0) return res.status(403).json({ message: "Không có quyền xem đơn này" })
+    }
+
     return res.json(rows[0])
   } catch (err) {
     return res.status(500).json({ message: "Lỗi server" })
@@ -68,6 +81,17 @@ export async function createLeave(req, res) {
       return res.status(400).json({ message: "Ngày kết thúc không được nhỏ hơn ngày bắt đầu" })
     }
 
+    // Kiểm tra trùng khoảng ngày nghỉ phép
+    const [overlap] = await pool.execute(`
+      SELECT id FROM leave_requests 
+      WHERE employee_id = ? 
+      AND status != 'Tu choi'
+      AND start_date <= ? AND end_date >= ?
+    `, [employee_id, end_date, start_date])
+    if (overlap.length > 0) {
+      return res.status(400).json({ message: "Nhân viên đã có đơn nghỉ phép trong khoảng thời gian này" })
+    }
+
     // Backend tự tính total_days, KHÔNG nhận từ Client để chống gian lận.
     // Tính từng ngày trong khoảng, chỉ loại trừ Chủ nhật (Thứ 7 vẫn tính là ngày làm việc bình thường).
     const total_days = countWorkingDays(start_date, end_date)
@@ -86,17 +110,19 @@ export async function createLeave(req, res) {
   }
 }
 
-// Đếm số ngày nghỉ phép thật, loại bỏ Chủ nhật (getDay() === 0)
+// Đếm số ngày nghỉ phép thật, loại bỏ Chủ nhật (getUTCDay() === 0)
 function countWorkingDays(startStr, endStr) {
-  const start = new Date(startStr)
-  const end = new Date(endStr)
+  const toStr = (val) => typeof val === "string" ? val.split("T")[0] : new Date(val).toISOString().split("T")[0]
+  const [sy, sm, sd] = toStr(startStr).split("-").map(Number)
+  const [ey, em, ed] = toStr(endStr).split("-").map(Number)
+  const current = new Date(Date.UTC(sy, sm - 1, sd))
+  const end = new Date(Date.UTC(ey, em - 1, ed))
   let count = 0
-  const current = new Date(start)
   while (current <= end) {
-    if (current.getDay() !== 0) { // 0 = Chủ nhật
+    if (current.getUTCDay() !== 0) { // 0 = Chủ nhật
       count++
     }
-    current.setDate(current.getDate() + 1)
+    current.setUTCDate(current.getUTCDate() + 1)
   }
   return count
 }
@@ -104,7 +130,7 @@ function countWorkingDays(startStr, endStr) {
 export async function approveLeave(req, res) {
   try {
     const [existing] = await pool.execute(
-      `SELECT l.id, l.status, e.department_id
+      `SELECT l.id, l.status, l.employee_id, e.department_id
        FROM leave_requests l
        LEFT JOIN employees e ON l.employee_id = e.id
        WHERE l.id = ?`,
@@ -112,6 +138,11 @@ export async function approveLeave(req, res) {
     )
     if (existing.length === 0) return res.status(404).json({ message: "Không tìm thấy đơn" })
     if (existing[0].status !== 'Cho duyet') return res.status(400).json({ message: "Đơn đã được xử lý" })
+
+    // Chặn Trưởng phòng tự duyệt đơn của chính mình
+    if (existing[0].employee_id === req.user.employee_id) {
+      return res.status(403).json({ message: "Bạn không thể tự duyệt đơn nghỉ phép của chính mình" })
+    }
 
     // Manager chỉ được duyệt đơn của nhân viên thuộc phòng ban mình quản lý
     if (req.user.role === "manager") {
@@ -136,10 +167,13 @@ export async function approveLeave(req, res) {
     )
     if (leaveRows.length > 0) {
       const { employee_id, start_date, end_date } = leaveRows[0]
-      const current = new Date(start_date)
-      const end = new Date(end_date)
+      const toStr = (val) => typeof val === "string" ? val.split("T")[0] : new Date(val).toISOString().split("T")[0]
+      const [sy, sm, sd] = toStr(start_date).split("-").map(Number)
+      const [ey, em, ed] = toStr(end_date).split("-").map(Number)
+      const current = new Date(Date.UTC(sy, sm - 1, sd))
+      const end = new Date(Date.UTC(ey, em - 1, ed))
       while (current <= end) {
-        if (current.getDay() !== 0) { // Bỏ qua Chủ nhật
+        if (current.getUTCDay() !== 0) { // Bỏ qua Chủ nhật
           const workDate = current.toISOString().split("T")[0]
           // Kiểm tra đã có bản ghi chưa
           const [existing] = await pool.execute(
@@ -160,7 +194,7 @@ export async function approveLeave(req, res) {
             )
           }
         }
-        current.setDate(current.getDate() + 1)
+        current.setUTCDate(current.getUTCDate() + 1)
       }
     }
 
@@ -200,6 +234,20 @@ export async function rejectLeave(req, res) {
       "UPDATE leave_requests SET status='Tu choi', reject_reason=?, approved_by=?, approved_at=NOW() WHERE id=?",
       [reject_reason, req.user.id, req.params.id]
     )
+
+    // Xóa các bản ghi Vắng mặt nếu đơn đã từng được duyệt (hoặc dọn dẹp)
+    const [leaveRows] = await pool.execute(
+      "SELECT employee_id, start_date, end_date FROM leave_requests WHERE id = ?",
+      [req.params.id]
+    )
+    if (leaveRows.length > 0) {
+      const { employee_id, start_date, end_date } = leaveRows[0]
+      await pool.execute(
+        "DELETE FROM attendances WHERE employee_id = ? AND work_date BETWEEN ? AND ? AND status = 'Vang mat' AND check_in IS NULL",
+        [employee_id, start_date, end_date]
+      )
+    }
+
     return res.json({ message: "Từ chối đơn thành công" })
   } catch (err) {
     return res.status(500).json({ message: "Lỗi server" })

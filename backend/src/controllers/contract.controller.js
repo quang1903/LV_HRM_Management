@@ -4,12 +4,19 @@ dotenv.config()
 
 export async function getContracts(req, res) {
   try {
-    const [rows] = await pool.execute(`
+    let query = `
       SELECT c.*, e.full_name, e.employee_code
       FROM contracts c
       LEFT JOIN employees e ON c.employee_id = e.id
-      ORDER BY c.created_at DESC
-    `)
+    `
+    const params = []
+    if (req.user.role === 'manager') {
+      query += ' WHERE e.department_id IN (SELECT id FROM departments WHERE manager_id = ?)'
+      params.push(req.user.employee_id)
+    }
+    query += ' ORDER BY c.created_at DESC'
+
+    const [rows] = await pool.execute(query, params)
     return res.json(rows)
   } catch (err) {
     return res.status(500).json({ message: "Lỗi server" })
@@ -19,12 +26,23 @@ export async function getContracts(req, res) {
 export async function getContractById(req, res) {
   try {
     const [rows] = await pool.execute(`
-      SELECT c.*, e.full_name, e.employee_code
+      SELECT c.*, e.full_name, e.employee_code, e.department_id
       FROM contracts c
       LEFT JOIN employees e ON c.employee_id = e.id
       WHERE c.id = ?
     `, [req.params.id])
     if (rows.length === 0) return res.status(404).json({ message: "Không tìm thấy hợp đồng" })
+
+    if (req.user.role === 'manager') {
+      const [dept] = await pool.execute(
+        "SELECT id FROM departments WHERE id = ? AND manager_id = ?",
+        [rows[0].department_id, req.user.employee_id]
+      )
+      if (dept.length === 0) {
+        return res.status(403).json({ message: "Bạn không có quyền xem hợp đồng này" })
+      }
+    }
+
     return res.json(rows[0])
   } catch (err) {
     return res.status(500).json({ message: "Lỗi server" })
@@ -40,8 +58,9 @@ export async function createContract(req, res) {
     if (end_date && new Date(end_date) <= new Date(start_date)) {
       return res.status(400).json({ message: "Ngày kết thúc phải sau ngày bắt đầu" })
     }
-    const [emp] = await pool.execute("SELECT id FROM employees WHERE id = ?", [employee_id])
+    const [emp] = await pool.execute("SELECT id, status FROM employees WHERE id = ?", [employee_id])
     if (emp.length === 0) return res.status(404).json({ message: "Không tìm thấy nhân viên" })
+    if (emp[0].status === 'Nghi viec') return res.status(400).json({ message: "Không thể tạo hợp đồng cho nhân viên đã nghỉ việc" })
     const [existing] = await pool.execute(
       "SELECT id FROM contracts WHERE employee_id = ? AND status = 'Dang hieu luc'",
       [employee_id]
@@ -62,8 +81,18 @@ export async function renewContract(req, res) {
   try {
     const { end_date } = req.body
     if (!end_date) return res.status(400).json({ message: "Vui lòng nhập ngày gia hạn mới" })
-    const [existing] = await pool.execute("SELECT id, start_date FROM contracts WHERE id = ?", [req.params.id])
+    const [existing] = await pool.execute("SELECT id, start_date, employee_id FROM contracts WHERE id = ?", [req.params.id])
     if (existing.length === 0) return res.status(404).json({ message: "Không tìm thấy hợp đồng" })
+
+    // Kiểm tra nhân viên còn làm việc không
+    const [empRows] = await pool.execute(
+      "SELECT status FROM employees WHERE id = ?",
+      [existing[0].employee_id]
+    )
+    if (empRows.length > 0 && empRows[0].status === 'Nghi viec') {
+      return res.status(400).json({ message: "Không thể gia hạn hợp đồng cho nhân viên đã nghỉ việc" })
+    }
+
     if (new Date(end_date) <= new Date(existing[0].start_date)) {
       return res.status(400).json({ message: "Ngày kết thúc phải sau ngày bắt đầu hợp đồng" })
     }
@@ -91,7 +120,7 @@ export async function terminateContract(req, res) {
 
 export async function getExpiringContracts(req, res) {
   try {
-    const [rows] = await pool.execute(`
+    let query = `
       SELECT c.*, e.full_name, e.employee_code
       FROM contracts c
       LEFT JOIN employees e ON c.employee_id = e.id
@@ -99,8 +128,15 @@ export async function getExpiringContracts(req, res) {
         AND c.end_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
         AND c.end_date >= CURDATE()
         AND c.status = 'Dang hieu luc'
-      ORDER BY c.end_date ASC
-    `)
+    `
+    const params = []
+    if (req.user.role === 'manager') {
+      query += ' AND e.department_id IN (SELECT id FROM departments WHERE manager_id = ?)'
+      params.push(req.user.employee_id)
+    }
+    query += ' ORDER BY c.end_date ASC'
+
+    const [rows] = await pool.execute(query, params)
     return res.json(rows)
   } catch (err) {
     return res.status(500).json({ message: "Lỗi server" })

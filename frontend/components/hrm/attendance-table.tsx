@@ -287,7 +287,7 @@ export function AttendanceTable() {
                   <label className="text-sm text-muted-foreground">Giờ check-in</label>
                   <input type="datetime-local"
                     className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 ring-ring/40"
-                    value={editAttendance.check_in?.substring(0, 16) || ""}
+                    value={editAttendance.check_in?.substring(0, 16).replace(" ", "T") || ""}
                     onChange={e => setEditAttendance({ ...editAttendance, check_in: e.target.value })}
                   />
                 </div>
@@ -295,7 +295,7 @@ export function AttendanceTable() {
                   <label className="text-sm text-muted-foreground">Giờ check-out</label>
                   <input type="datetime-local"
                     className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 ring-ring/40"
-                    value={editAttendance.check_out?.substring(0, 16) || ""}
+                    value={editAttendance.check_out?.substring(0, 16).replace(" ", "T") || ""}
                     onChange={e => setEditAttendance({ ...editAttendance, check_out: e.target.value })}
                   />
                 </div>

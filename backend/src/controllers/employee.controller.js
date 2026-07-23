@@ -123,6 +123,29 @@ export async function createEmployee(req, res) {
       VALUES (?, ?, ?, 'employee', ?, 1)
     `, [username, email, hashed, employeeId])
 
+    // Kiểm tra chức vụ có phải Trưởng phòng không
+    if (position_id) {
+      const [posRows] = await conn.execute(
+        "SELECT name, department_id FROM positions WHERE id = ?", [position_id]
+      )
+      if (posRows.length > 0 && posRows[0].name.toLowerCase().includes("trưởng phòng")) {
+        // Nâng role lên manager
+        await conn.execute("UPDATE users SET role = 'manager' WHERE employee_id = ?", [employeeId])
+        // Gán manager_id cho phòng ban nếu chưa có
+        if (posRows[0].department_id) {
+          const [deptRows] = await conn.execute(
+            "SELECT manager_id FROM departments WHERE id = ?", [posRows[0].department_id]
+          )
+          if (deptRows.length > 0 && !deptRows[0].manager_id) {
+            await conn.execute(
+              "UPDATE departments SET manager_id = ? WHERE id = ?",
+              [employeeId, posRows[0].department_id]
+            )
+          }
+        }
+      }
+    }
+
     await conn.commit()
     conn.release()
     return res.status(201).json({ message: "Thêm nhân viên thành công", id: employeeId })
@@ -164,8 +187,11 @@ export async function updateEmployee(req, res) {
         const empDeptId = posRows[0].department_id
 
         if (isLeader && empDeptId) {
-          // Nâng role lên manager
-          await pool.execute("UPDATE users SET role = 'manager' WHERE employee_id = ?", [req.params.id])
+          // Nâng role lên manager (không hạ role của admin và hr)
+          const [userRows2] = await pool.execute("SELECT role FROM users WHERE employee_id = ?", [req.params.id])
+          if (userRows2.length > 0 && userRows2[0].role !== 'admin' && userRows2[0].role !== 'hr') {
+            await pool.execute("UPDATE users SET role = 'manager' WHERE employee_id = ?", [req.params.id])
+          }
 
           // Xóa manager_id ở phòng ban cũ nếu có
           await pool.execute(
@@ -200,6 +226,15 @@ export async function deactivateEmployee(req, res) {
     if (contracts.length > 0) return res.status(400).json({ message: "Nhân viên còn hợp đồng đang hiệu lực" })
     await pool.execute("UPDATE employees SET status = 'Nghi viec' WHERE id = ?", [req.params.id])
     await pool.execute("UPDATE users SET is_active = 0 WHERE employee_id = ?", [req.params.id])
+
+    // Hủy manager_id phòng ban nếu đang là Trưởng phòng
+    await pool.execute("UPDATE departments SET manager_id = NULL WHERE manager_id = ?", [req.params.id])
+    // Hạ role về employee
+    const [userRows] = await pool.execute("SELECT role FROM users WHERE employee_id = ?", [req.params.id])
+    if (userRows.length > 0 && userRows[0].role === 'manager') {
+      await pool.execute("UPDATE users SET role = 'employee' WHERE employee_id = ?", [req.params.id])
+    }
+
     return res.json({ message: "Vô hiệu hóa nhân viên thành công" })
   } catch (err) {
     return res.status(500).json({ message: "Lỗi server" })
@@ -224,6 +259,14 @@ export async function permanentDelete(req, res) {
     const [existing] = await pool.execute("SELECT id, status FROM employees WHERE id = ?", [req.params.id])
     if (existing.length === 0) return res.status(404).json({ message: "Không tìm thấy nhân viên" })
     if (existing[0].status !== 'Nghi viec') return res.status(400).json({ message: "Chỉ xóa được nhân viên đã nghỉ việc" })
+
+    // Xóa dữ liệu liên quan trước tránh lỗi Foreign Key Constraint
+    await pool.execute("DELETE FROM attendances WHERE employee_id = ?", [req.params.id])
+    await pool.execute("DELETE FROM leave_requests WHERE employee_id = ?", [req.params.id])
+    await pool.execute("DELETE FROM contracts WHERE employee_id = ?", [req.params.id])
+    await pool.execute("DELETE FROM profile_change_requests WHERE employee_id = ?", [req.params.id])
+    await pool.execute("UPDATE departments SET manager_id = NULL WHERE manager_id = ?", [req.params.id])
+
     await pool.execute("DELETE FROM users WHERE employee_id = ?", [req.params.id])
     await pool.execute("DELETE FROM employees WHERE id = ?", [req.params.id])
     return res.json({ message: "Xóa nhân viên thành công" })

@@ -8,6 +8,11 @@ export async function getAttendanceReport(req, res) {
     const m = month || new Date().getMonth() + 1
     const y = year  || new Date().getFullYear()
 
+    const params = [m, y]
+    if (req.user.role === 'manager') {
+      params.push(req.user.employee_id)
+    }
+
     const [rows] = await pool.execute(`
       SELECT
         e.id, e.full_name, e.employee_code,
@@ -23,9 +28,10 @@ export async function getAttendanceReport(req, res) {
       LEFT JOIN attendances a ON e.id = a.employee_id
         AND MONTH(a.work_date) = ? AND YEAR(a.work_date) = ?
       WHERE e.status = 'Dang lam'
+        ${req.user.role === 'manager' ? 'AND e.department_id IN (SELECT id FROM departments WHERE manager_id = ?)' : ''}
       GROUP BY e.id, e.full_name, e.employee_code, d.name
       ORDER BY d.name, e.full_name
-    `, [m, y])
+    `, params)
     return res.json(rows)
   } catch (err) {
     return res.status(500).json({ message: "Lỗi server" })
@@ -34,6 +40,13 @@ export async function getAttendanceReport(req, res) {
 
 export async function getDepartmentReport(req, res) {
   try {
+    const deptParams = []
+    let deptWhere = ""
+    if (req.user.role === 'manager') {
+      deptWhere = "WHERE d.id IN (SELECT id FROM departments WHERE manager_id = ?)"
+      deptParams.push(req.user.employee_id)
+    }
+
     const [rows] = await pool.execute(`
       SELECT
         d.id, d.name as department_name,
@@ -44,9 +57,10 @@ export async function getDepartmentReport(req, res) {
       FROM departments d
       LEFT JOIN employees e ON d.id = e.department_id
       LEFT JOIN employees e_manager ON d.manager_id = e_manager.id
+      ${deptWhere}
       GROUP BY d.id, d.name, e_manager.full_name
       ORDER BY d.name
-    `)
+    `, deptParams)
     return res.json(rows)
   } catch (err) {
     return res.status(500).json({ message: "Lỗi server" })
@@ -58,6 +72,11 @@ export async function getLeaveReport(req, res) {
     const { month, year } = req.query
     const m = month || new Date().getMonth() + 1
     const y = year  || new Date().getFullYear()
+
+    const params = [m, y]
+    if (req.user.role === 'manager') {
+      params.push(req.user.employee_id)
+    }
 
     const [rows] = await pool.execute(`
       SELECT
@@ -72,9 +91,10 @@ export async function getLeaveReport(req, res) {
       LEFT JOIN leave_requests l ON e.id = l.employee_id
         AND MONTH(l.start_date) = ? AND YEAR(l.start_date) = ?
       WHERE e.status = 'Dang lam'
+        ${req.user.role === 'manager' ? 'AND e.department_id IN (SELECT id FROM departments WHERE manager_id = ?)' : ''}
       GROUP BY e.id, e.full_name, e.employee_code, d.name
       ORDER BY d.name, e.full_name
-    `, [m, y])
+    `, params)
     return res.json(rows)
   } catch (err) {
     return res.status(500).json({ message: "Lỗi server" })
@@ -83,11 +103,15 @@ export async function getLeaveReport(req, res) {
 
 export async function getContractReport(req, res) {
   try {
+    const expiringParams = req.user.role === 'manager' ? [req.user.employee_id] : []
+
     const [summary] = await pool.execute(`
-      SELECT status, COUNT(*) as total
-      FROM contracts
-      GROUP BY status
-    `)
+      SELECT c.status, COUNT(*) as total
+      FROM contracts c
+      LEFT JOIN employees e ON c.employee_id = e.id
+      ${req.user.role === 'manager' ? 'WHERE e.department_id IN (SELECT id FROM departments WHERE manager_id = ?)' : ''}
+      GROUP BY c.status
+    `, expiringParams)
 
     const [expiring] = await pool.execute(`
       SELECT c.*, e.full_name, e.employee_code
@@ -97,8 +121,9 @@ export async function getContractReport(req, res) {
         AND c.end_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
         AND c.end_date >= CURDATE()
         AND c.status = 'Dang hieu luc'
+        ${req.user.role === 'manager' ? 'AND e.department_id IN (SELECT id FROM departments WHERE manager_id = ?)' : ''}
       ORDER BY c.end_date ASC
-    `)
+    `, expiringParams)
 
     return res.json({ summary, expiring })
   } catch (err) {

@@ -15,9 +15,6 @@ export async function getUsers(req, res) {
       LEFT JOIN employees e ON u.employee_id = e.id
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN departments dm ON dm.manager_id = e.id
-      GROUP BY u.id, u.username, u.email, u.role, u.is_active, u.last_login_at, u.created_at,
-               u.employee_id, e.full_name, e.employee_code, e.department_id, d.name
-
     `
     const params = []
 
@@ -31,7 +28,11 @@ export async function getUsers(req, res) {
       params.push(req.user.employee_id)
     }
 
-    query += " ORDER BY u.created_at DESC"
+    query += `
+      GROUP BY u.id, u.username, u.email, u.role, u.is_active, u.last_login_at, u.created_at,
+               u.employee_id, e.full_name, e.employee_code, e.department_id, d.name
+      ORDER BY u.created_at DESC
+    `
     const [rows] = await pool.execute(query, params)
 
     // Ẩn email với role employee
@@ -61,6 +62,12 @@ export async function createUser(req, res) {
     if (existing.length > 0) return res.status(400).json({ message: "Email hoặc username đã tồn tại" })
 
     if (employee_id) {
+      const [empRows] = await pool.execute("SELECT id, status FROM employees WHERE id = ?", [employee_id])
+      if (empRows.length === 0) return res.status(400).json({ message: "Không tìm thấy nhân viên" })
+      if (empRows[0].status === 'Nghi viec') {
+        return res.status(400).json({ message: "Nhân viên đã nghỉ việc, không thể tạo tài khoản" })
+      }
+
       const [dupEmp] = await pool.execute("SELECT id FROM users WHERE employee_id = ?", [employee_id])
       if (dupEmp.length > 0) return res.status(400).json({ message: "Nhân viên này đã có tài khoản" })
     }

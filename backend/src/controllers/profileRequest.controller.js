@@ -86,6 +86,15 @@ export async function approveRequest(req, res) {
   try {
     const [rows] = await pool.execute("SELECT * FROM profile_change_requests WHERE id = ?", [req.params.id])
     if (rows.length === 0) return res.status(404).json({ message: "Không tìm thấy yêu cầu" })
+
+    // Kiểm tra nhân viên còn làm việc không
+    const [empRows] = await pool.execute(
+      "SELECT status FROM employees WHERE id = ?", [rows[0].employee_id]
+    )
+    if (empRows.length > 0 && empRows[0].status === 'Nghi viec') {
+      return res.status(400).json({ message: "Nhân viên đã nghỉ việc, không thể duyệt yêu cầu" })
+    }
+
     const request = rows[0]
     if (request.status !== "Cho duyet") return res.status(400).json({ message: "Yêu cầu này đã được xử lý trước đó" })
 

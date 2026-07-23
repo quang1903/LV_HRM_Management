@@ -23,6 +23,11 @@ export async function getAttendances(req, res) {
       params.push(req.user.id)
     }
 
+    if (req.user.role === "manager") {
+      query += " AND e.department_id IN (SELECT id FROM departments WHERE manager_id = ?)"
+      params.push(req.user.employee_id)
+    }
+
     if (month && year) {
       query += " AND MONTH(a.work_date) = ? AND YEAR(a.work_date) = ?"
       params.push(month, year)
@@ -49,6 +54,19 @@ export async function getAttendanceById(req, res) {
       WHERE a.id = ?
     `, [req.params.id])
     if (rows.length === 0) return res.status(404).json({ message: "Không tìm thấy bản ghi chấm công" })
+
+    const isSelf = rows[0].employee_id === req.user.employee_id
+    if (req.user.role === 'employee' && !isSelf) {
+      return res.status(403).json({ message: "Không có quyền xem bản ghi này" })
+    }
+    if (req.user.role === 'manager' && !isSelf) {
+      const [dept] = await pool.execute(
+        "SELECT id FROM departments WHERE id = (SELECT department_id FROM employees WHERE id = ?) AND manager_id = ?",
+        [rows[0].employee_id, req.user.employee_id]
+      )
+      if (dept.length === 0) return res.status(403).json({ message: "Không có quyền xem bản ghi này" })
+    }
+
     return res.json(rows[0])
   } catch (err) {
     return res.status(500).json({ message: "Lỗi server" })
@@ -61,11 +79,26 @@ export async function createAttendance(req, res) {
     if (!employee_id || !work_date) {
       return res.status(400).json({ message: "Vui lòng nhập đầy đủ thông tin bắt buộc" })
     }
+
+    const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Ho_Chi_Minh" })
+    if (work_date > today) {
+      return res.status(400).json({ message: "Không thể thêm chấm công cho ngày tương lai" })
+    }
     const [existing] = await pool.execute(
       "SELECT id FROM attendances WHERE employee_id = ? AND work_date = ?",
       [employee_id, work_date]
     )
     if (existing.length > 0) return res.status(400).json({ message: "Nhân viên đã có bản ghi chấm công ngày này" })
+
+    // Format check_in và check_out thành DATETIME đầy đủ
+    const formatTime = (time, date) => {
+      if (!time) return null
+      if (time.includes(date)) return time
+      return `${date} ${time}:00`
+    }
+
+    const checkInFormatted = formatTime(check_in, work_date)
+    const checkOutFormatted = formatTime(check_out, work_date)
 
     let work_minutes = 0
     if (check_in && check_out) {
@@ -83,7 +116,7 @@ export async function createAttendance(req, res) {
     const [result] = await pool.execute(`
       INSERT INTO attendances (employee_id, shift_id, work_date, check_in, check_out, work_minutes, status, note)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, [employee_id, shift_id || null, work_date, check_in || null, check_out || null, work_minutes, status || 'Vang mat', note || null])
+    `, [employee_id, shift_id || null, work_date, checkInFormatted, checkOutFormatted, work_minutes, status || 'Vang mat', note || null])
     return res.status(201).json({ message: "Thêm chấm công thành công", id: result.insertId })
   } catch (err) {
     console.error(err)
@@ -94,8 +127,20 @@ export async function createAttendance(req, res) {
 export async function updateAttendance(req, res) {
   try {
     const { check_in, check_out, status, note } = req.body
-    const [existing] = await pool.execute("SELECT id FROM attendances WHERE id = ?", [req.params.id])
+    const [existing] = await pool.execute("SELECT id, work_date FROM attendances WHERE id = ?", [req.params.id])
     if (existing.length === 0) return res.status(404).json({ message: "Không tìm thấy bản ghi chấm công" })
+
+    const rawDate = existing[0]?.work_date
+    const work_date = rawDate ? (typeof rawDate === 'string' ? rawDate.split('T')[0] : new Date(rawDate).toISOString().split('T')[0]) : null
+
+    const formatTime = (time, date) => {
+      if (!time || !date) return null
+      if (time.includes(date)) return time
+      return `${date} ${time}:00`
+    }
+
+    const checkInFormatted = formatTime(check_in, work_date)
+    const checkOutFormatted = formatTime(check_out, work_date)
 
     let work_minutes = 0
     if (check_in && check_out) {
@@ -111,7 +156,7 @@ export async function updateAttendance(req, res) {
 
     await pool.execute(`
       UPDATE attendances SET check_in=?, check_out=?, work_minutes=?, status=?, note=? WHERE id=?
-    `, [check_in || null, check_out || null, work_minutes, status || 'Vang mat', note || null, req.params.id])
+    `, [checkInFormatted, checkOutFormatted, work_minutes, status || 'Vang mat', note || null, req.params.id])
     return res.json({ message: "Cập nhật chấm công thành công" })
   } catch (err) {
     return res.status(500).json({ message: "Lỗi server" })
@@ -148,6 +193,16 @@ export async function checkIn(req, res) {
     if (employees.length === 0) return res.status(404).json({ message: "Không tìm thấy nhân viên" })
     const employee = employees[0]
     const { now, nowVN, today } = getVietnamTime()
+
+    // Kiểm tra ngày nghỉ phép đã duyệt
+    const [absent] = await pool.execute(
+      "SELECT id FROM attendances WHERE employee_id = ? AND work_date = ? AND status = 'Vang mat' AND check_in IS NULL",
+      [employee.id, today]
+    )
+    if (absent.length > 0) {
+      return res.status(400).json({ message: "Hôm nay bạn đã được duyệt nghỉ phép, không thể check-in" })
+    }
+
     const [existing] = await pool.execute(
       "SELECT id, check_in FROM attendances WHERE employee_id = ? AND work_date = ?",
       [employee.id, today]
@@ -201,7 +256,7 @@ export async function checkOut(req, res) {
     const employee = employees[0]
 
     const [existing] = await pool.execute(
-      "SELECT id, check_in FROM attendances WHERE employee_id = ? AND check_in IS NOT NULL AND check_out IS NULL AND check_in >= DATE_SUB(NOW(), INTERVAL 24 HOUR) ORDER BY check_in DESC LIMIT 1",
+      "SELECT id, check_in, status FROM attendances WHERE employee_id = ? AND check_in IS NOT NULL AND check_out IS NULL AND check_in >= DATE_SUB(NOW(), INTERVAL 24 HOUR) ORDER BY check_in DESC LIMIT 1",
       [employee.id]
     )
     if (existing.length === 0) return res.status(400).json({ message: "Không tìm thấy bản ghi check-in hợp lệ để check-out" })
@@ -212,7 +267,15 @@ export async function checkOut(req, res) {
       return res.status(400).json({ message: "Bạn vừa check-in, vui lòng chờ ít nhất 3 giây trước khi check-out" })
     }
     const work_minutes = Math.round(diffMinutes)
-    await pool.execute("UPDATE attendances SET check_out=?, work_minutes=? WHERE id=?", [now, work_minutes, existing[0].id])
+
+    const { nowVN } = getVietnamTime()
+    const hour = nowVN.getHours()
+    let status = existing[0].status
+    if (hour < 17 && status === 'Dung gio') {
+      status = 'Ve som'
+    }
+
+    await pool.execute("UPDATE attendances SET check_out=?, work_minutes=?, status=? WHERE id=?", [now, work_minutes, status, existing[0].id])
     return res.json({ message: "Check-out thành công", full_name: employee.full_name, check_out: now, work_minutes })
   } catch (err) {
     console.error(err)

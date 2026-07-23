@@ -70,6 +70,39 @@ export async function updatePosition(req, res) {
       "UPDATE positions SET name=?, department_id=? WHERE id=?",
       [name, department_id || null, req.params.id]
     )
+
+    const isLeader = name?.toLowerCase().includes("trưởng phòng")
+
+    // Lấy danh sách nhân viên đang giữ chức vụ này
+    const [emps] = await pool.execute(
+      "SELECT e.id FROM employees e WHERE e.position_id = ? AND e.status = 'Dang lam'",
+      [req.params.id]
+    )
+
+    for (const emp of emps) {
+      const [userRows] = await pool.execute(
+        "SELECT role FROM users WHERE employee_id = ?", [emp.id]
+      )
+      if (userRows.length === 0) continue
+      const role = userRows[0].role
+      if (isLeader && role !== 'admin' && role !== 'hr' && role !== 'manager') {
+        await pool.execute("UPDATE users SET role = 'manager' WHERE employee_id = ?", [emp.id])
+        if (department_id) {
+          const [dept] = await pool.execute("SELECT manager_id FROM departments WHERE id = ?", [department_id])
+          if (dept.length > 0 && !dept[0].manager_id) {
+            await pool.execute("UPDATE departments SET manager_id = ? WHERE id = ?", [emp.id, department_id])
+          }
+        }
+      } else if (!isLeader && role === 'manager') {
+        const [otherDepts] = await pool.execute(
+          "SELECT id FROM departments WHERE manager_id = ?", [emp.id]
+        )
+        if (otherDepts.length === 0) {
+          await pool.execute("UPDATE users SET role = 'employee' WHERE employee_id = ?", [emp.id])
+        }
+      }
+    }
+
     return res.json({ message: "Cập nhật chức vụ thành công" })
   } catch (err) {
     return res.status(500).json({ message: "Lỗi server" })

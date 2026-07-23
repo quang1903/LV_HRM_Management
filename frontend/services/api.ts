@@ -64,6 +64,8 @@ api.interceptors.response.use(
         localStorage.removeItem("hrm_user")
         localStorage.removeItem("hrm_access_token")
         localStorage.removeItem("hrm_refresh_token")
+        // Xóa cookie hrm_user
+        document.cookie = "hrm_user=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"
         if (typeof window !== "undefined") window.location.href = "/login"
         return Promise.reject(error)
       } finally {

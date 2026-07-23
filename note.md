@@ -41,3 +41,4 @@
 1. **Testing toàn diện cho các case chuyển phòng ban**: Cần rà soát khi Admin đổi phòng ban của một nhân viên đang là Trưởng phòng sang phòng mới thì cơ chế tháo quyền `manager` hiện tại đã cover đủ chặt chẽ chưa.
 2. **Kiểm tra kỹ lại các Route bảo mật khác**: Ngoài module Nghỉ phép, còn module Báo cáo hoặc Lương thưởng (nếu có) cũng cần phân quyền rạch ròi theo cấp Quản lý trực tiếp.
 3. **Phân trang (Pagination) cho dữ liệu Excel**: Hiện tại Xuất Excel "Tất cả" load toàn bộ dữ liệu, sau này nếu database lên đến 10,000+ nhân viên có thể cần làm api stream file từ backend thay vì fetch array ở frontend để tránh đứng trình duyệt.
+
