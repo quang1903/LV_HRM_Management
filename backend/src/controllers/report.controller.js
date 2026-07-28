@@ -9,7 +9,11 @@ export async function getAttendanceReport(req, res) {
     const m = month || (nowVN.getMonth() + 1)
     const y = year  || nowVN.getFullYear()
 
-    const params = [m, y]
+    const mm = String(m).padStart(2, "0")
+    const startDate = `${y}-${mm}-01`
+    const lastDay = new Date(y, m, 0).getDate()
+    const endDate = `${y}-${mm}-${String(lastDay).padStart(2, "0")}`
+    const params = [startDate, endDate]
     if (req.user.role === 'manager') {
       params.push(req.user.employee_id)
     }
@@ -27,7 +31,7 @@ export async function getAttendanceReport(req, res) {
       FROM employees e
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN attendances a ON e.id = a.employee_id
-        AND MONTH(a.work_date) = ? AND YEAR(a.work_date) = ?
+        AND a.work_date BETWEEN ? AND ?
       WHERE e.status = 'Dang lam'
         ${req.user.role === 'manager' ? 'AND e.department_id IN (SELECT id FROM departments WHERE manager_id = ?)' : ''}
       GROUP BY e.id, e.full_name, e.employee_code, d.name
@@ -75,7 +79,11 @@ export async function getLeaveReport(req, res) {
     const m = month || (nowVN.getMonth() + 1)
     const y = year  || nowVN.getFullYear()
 
-    const params = [m, y]
+    const mm = String(m).padStart(2, "0")
+    const startDate = `${y}-${mm}-01`
+    const lastDay = new Date(y, m, 0).getDate()
+    const endDate = `${y}-${mm}-${String(lastDay).padStart(2, "0")}`
+    const params = [startDate, endDate]
     if (req.user.role === 'manager') {
       params.push(req.user.employee_id)
     }
@@ -91,7 +99,7 @@ export async function getLeaveReport(req, res) {
       FROM employees e
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN leave_requests l ON e.id = l.employee_id
-        AND MONTH(l.start_date) = ? AND YEAR(l.start_date) = ?
+        AND l.start_date BETWEEN ? AND ?
       WHERE e.status = 'Dang lam'
         ${req.user.role === 'manager' ? 'AND e.department_id IN (SELECT id FROM departments WHERE manager_id = ?)' : ''}
       GROUP BY e.id, e.full_name, e.employee_code, d.name

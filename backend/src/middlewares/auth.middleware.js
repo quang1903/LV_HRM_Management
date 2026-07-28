@@ -3,6 +3,27 @@ import dotenv from "dotenv"
 import pool from "../config/db.js"
 dotenv.config()
 
+// Cache settings 60 giây, không query DB mỗi request
+let settingsCache = null
+let settingsCacheTime = 0
+const CACHE_TTL = 60 * 1000
+
+export function clearSettingsCache() {
+  settingsCache = null
+  settingsCacheTime = 0
+}
+
+async function getDeviceLockEnabled() {
+  const now = Date.now()
+  if (settingsCache !== null && now - settingsCacheTime < CACHE_TTL) {
+    return settingsCache
+  }
+  const [rows] = await pool.execute("SELECT device_lock_enabled FROM settings WHERE id = 1")
+  settingsCache = rows.length > 0 ? rows[0].device_lock_enabled === 1 : false
+  settingsCacheTime = now
+  return settingsCache
+}
+
 export async function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -10,13 +31,13 @@ export async function authMiddleware(req, res, next) {
   }
   const token = authHeader.split(" ")[1]
   const deviceId = req.headers["x-device-id"]
+
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
 
     // Device Lock: KHÔNG áp dụng cho Admin, và chỉ áp dụng khi setting đang bật
     if (decoded.role !== "admin") {
-      const [settingsRows] = await pool.execute("SELECT device_lock_enabled FROM settings WHERE id = 1")
-      const deviceLockEnabled = settingsRows.length > 0 ? settingsRows[0].device_lock_enabled === 1 : false
+      const deviceLockEnabled = await getDeviceLockEnabled()
 
       if (deviceLockEnabled) {
         const [rows] = await pool.execute("SELECT device_id FROM users WHERE id = ?", [decoded.id])

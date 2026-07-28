@@ -29,7 +29,12 @@ export function MyQRCode() {
     try {
       setExpired(false)
       const res = await employeeService.getMyQR()
-      const dataUrl = await QRCode.toDataURL(res.data.qr_value, { width: 220, margin: 1 })
+      const dataUrl = await QRCode.toDataURL(res.data.qr_value, {
+        width: 320,
+        margin: 2,
+        errorCorrectionLevel: "H",
+        color: { dark: "#000000", light: "#ffffff" }
+      })
       setQrImage(dataUrl)
       setSecondsLeft(30)
       setFetchCount(prev => prev + 1)

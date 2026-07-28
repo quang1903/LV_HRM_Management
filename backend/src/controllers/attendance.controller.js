@@ -29,8 +29,12 @@ export async function getAttendances(req, res) {
     }
 
     if (month && year) {
-      query += " AND MONTH(a.work_date) = ? AND YEAR(a.work_date) = ?"
-      params.push(month, year)
+      const m = String(month).padStart(2, "0")
+      const startDate = `${year}-${m}-01`
+      const lastDay = new Date(year, month, 0).getDate()
+      const endDate = `${year}-${m}-${String(lastDay).padStart(2, "0")}`
+      query += " AND a.work_date BETWEEN ? AND ?"
+      params.push(startDate, endDate)
     }
     if (department_id) {
       query += " AND e.department_id = ?"

@@ -1,4 +1,5 @@
 import pool from "../config/db.js"
+import { clearSettingsCache } from "../middlewares/auth.middleware.js"
 
 export async function getSettings(req, res) {
   try {
@@ -52,6 +53,7 @@ export async function updateDeviceLock(req, res) {
         [value]
       )
     }
+    clearSettingsCache()
     return res.json({ message: value ? "Đã bật Device Lock" : "Đã tắt Device Lock", device_lock_enabled: value })
   } catch (err) {
     console.error(err)

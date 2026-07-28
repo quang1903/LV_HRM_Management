@@ -198,13 +198,19 @@ function CalendarPicker({ value, onChange }: { value: string; onChange: (val: st
   )
 }
 
-export function EmployeeTable() {
+export function EmployeeTable({
+  initialEmployees,
+  initialDepartments,
+}: {
+  initialEmployees?: any[]
+  initialDepartments?: any[]
+} = {}) {
   const { user } = useAuth()
   const canEdit = user?.role === "admin" || user?.role === "hr"
 
-  const [employees, setEmployees] = useState<Employee[]>([])
-  const [departments, setDepartments] = useState<Department[]>([])
-  const [loading, setLoading] = useState(true)
+  const [employees, setEmployees] = useState<Employee[]>(initialEmployees || [])
+  const [departments, setDepartments] = useState<Department[]>(initialDepartments || [])
+  const [loading, setLoading] = useState(!initialEmployees)
   const [search, setSearch] = useState("")
   const [showInactive, setShowInactive] = useState(false)
   const [viewEmployee, setViewEmployee] = useState<Employee | null>(null)
@@ -224,9 +230,19 @@ export function EmployeeTable() {
   const [importResult, setImportResult] = useState<{ successCount: number; totalRows: number; errors: string[] } | null>(null)
 
   useEffect(() => {
-    fetchEmployees()
-    departmentService.getAll().then(res => setDepartments(res.data)).catch(() => { })
-  }, [])
+    if (initialEmployees && initialEmployees.length > 0) {
+      setEmployees(initialEmployees)
+      setLoading(false)
+    } else if (!initialEmployees) {
+      fetchEmployees()
+    }
+
+    if (initialDepartments && initialDepartments.length > 0) {
+      setDepartments(initialDepartments)
+    } else if (!initialDepartments) {
+      departmentService.getAll().then(res => setDepartments(res.data)).catch(() => {})
+    }
+  }, [initialEmployees, initialDepartments])
 
   const fetchEmployees = async () => {
     try {

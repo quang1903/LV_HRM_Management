@@ -8,6 +8,10 @@ import { EmployeeTable } from "@/components/hrm/employee-table"
 import { ActivityPanel } from "@/components/hrm/activity-panel"
 import { useEffect, useState } from "react"
 import { departmentService } from "@/services/department"
+import { employeeService } from "@/services/employee"
+import { attendanceService } from "@/services/attendance"
+import { leaveService } from "@/services/leave"
+import { contractService } from "@/services/contract"
 import { AlertTriangle, X } from "lucide-react"
 import Link from "next/link"
 
@@ -19,18 +23,46 @@ export default function Page() {
   const [missingManagers, setMissingManagers] = useState<string[]>([])
   const [showModal, setShowModal] = useState(false)
 
+  // Fetch chung 1 lần cho toàn Dashboard
+  const [dashData, setDashData] = useState<{
+    employees: any[]
+    attendance: any[]
+    leaves: any[]
+    contracts: any[]
+    departments: any[]
+  } | null>(null)
+
   useEffect(() => {
-    if (!canSeeAlerts) return
-    departmentService.getAll()
-      .then(res => {
-        const missing = res.data
+    if (!user) return
+    const today = new Date()
+    const month = today.getMonth() + 1
+    const year = today.getFullYear()
+
+    Promise.all([
+      employeeService.getAll().catch(() => ({ data: [] })),
+      attendanceService.getAll({ month, year }).catch(() => ({ data: [] })),
+      leaveService.getAll().catch(() => ({ data: [] })),
+      user.role !== "employee"
+        ? contractService.getExpiring().catch(() => ({ data: [] }))
+        : Promise.resolve({ data: [] }),
+      departmentService.getAll().catch(() => ({ data: [] })),
+    ]).then(([empRes, attRes, leaveRes, contractRes, deptRes]) => {
+      setDashData({
+        employees: empRes.data || [],
+        attendance: attRes.data || [],
+        leaves: leaveRes.data || [],
+        contracts: contractRes.data || [],
+        departments: deptRes.data || [],
+      })
+      if (canSeeAlerts) {
+        const missing = (deptRes.data || [])
           .filter((d: any) => !d.manager_id && d.name !== "Nhân sự")
           .map((d: any) => d.name)
         setMissingManagers(missing)
         if (missing.length > 0) setShowModal(true)
-      })
-      .catch(() => {})
-  }, [canSeeAlerts])
+      }
+    })
+  }, [user, canSeeAlerts])
 
   return (
     <div className="flex min-h-screen bg-muted/40">
@@ -47,9 +79,14 @@ export default function Page() {
                 Theo dõi các chỉ số quan trọng và hoạt động nhân sự trong công ty
               </p>
             </div>
-            <StatCards />
-            <ActivityPanel />
-            {canSeeAllEmployees && <EmployeeTable />}
+            <StatCards data={dashData} />
+            <ActivityPanel data={dashData} />
+            {canSeeAllEmployees && (
+              <EmployeeTable
+                initialEmployees={dashData?.employees}
+                initialDepartments={dashData?.departments}
+              />
+            )}
           </div>
         </main>
       </div>

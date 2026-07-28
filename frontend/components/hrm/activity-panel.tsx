@@ -1,94 +1,18 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
 import { Card } from "@/components/ui/card"
-import { CalendarDays, FileText, UserPlus, Clock, Loader2 } from "lucide-react"
+import { CalendarDays, FileText, Clock, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/context/AuthContext"
-import { employeeService } from "@/services/employee"
-import { leaveService } from "@/services/leave"
-import { contractService } from "@/services/contract"
-import { attendanceService } from "@/services/attendance"
 
-export function ActivityPanel() {
-  const { user, isLoading } = useAuth()
-  const [activities, setActivities] = useState<any[]>([])
-  const [expiring, setExpiring]     = useState<any[]>([])
-  const [loading, setLoading]       = useState(true)
+interface Props {
+  data: { employees: any[]; attendance: any[]; leaves: any[]; contracts: any[] } | null
+}
 
-  useEffect(() => {
-    if (isLoading || !user) return
-    fetchData()
-  }, [user, isLoading])
-
-  const fetchData = async () => {
-    try {
-      setLoading(true)
-      const today = new Date()
-      const month = today.getMonth() + 1
-      const year  = today.getFullYear()
-
-      const [leaveRes, contractRes, attRes] = await Promise.all([
-        leaveService.getAll().catch(() => ({ data: [] })),
-        user?.role !== "employee"
-          ? contractService.getExpiring().catch(() => ({ data: [] }))
-          : Promise.resolve({ data: [] }),
-        attendanceService.getAll({ month, year }).catch(() => ({ data: [] })),
-      ])
-
-      const acts: any[] = []
-
-      // Đơn nghỉ phép chờ duyệt
-      const pending = leaveRes.data.filter((l: any) => l.status === "Cho duyet").slice(0, 2)
-      pending.forEach((l: any) => {
-        acts.push({
-          icon: CalendarDays,
-          iconBg: "bg-amber-100",
-          iconColor: "text-amber-700",
-          title: "Yêu cầu nghỉ phép",
-          description: `${l.full_name} xin nghỉ từ ${l.start_date?.substring(0, 10)} đến ${l.end_date?.substring(0, 10)}`,
-          time: l.created_at ? new Date(l.created_at).toLocaleDateString("vi-VN") : "",
-          href: "/leave",
-        })
-      })
-
-      // Hợp đồng sắp hết hạn
-      contractRes.data.slice(0, 1).forEach((c: any) => {
-        acts.push({
-          icon: FileText,
-          iconBg: "bg-rose-100",
-          iconColor: "text-rose-700",
-          title: "Hợp đồng sắp hết hạn",
-          description: `Hợp đồng của ${c.full_name} hết hạn ${c.end_date?.substring(0, 10)}`,
-          time: `Hết hạn: ${c.end_date?.substring(0, 10)}`,
-          href: "/contracts",
-        })
-      })
-
-      // Chấm công hôm nay
-      const todayStr = today.toISOString().split("T")[0]
-      const todayAtt = attRes.data.filter((a: any) =>
-        a.work_date?.substring(0, 10) === todayStr && a.check_in
-      )
-      acts.push({
-        icon: Clock,
-        iconBg: "bg-emerald-100",
-        iconColor: "text-emerald-700",
-        title: "Chấm công hôm nay",
-        description: `${todayAtt.length}/6 nhân viên đã chấm công hôm nay`,
-        time: "Hôm nay",
-        href: "/attendance",
-      })
-
-      setActivities(acts)
-      setExpiring(contractRes.data.slice(0, 3))
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }
+export function ActivityPanel({ data }: Props) {
+  const { user } = useAuth()
+  const loading = !data
 
   if (loading) {
     return (
@@ -103,6 +27,52 @@ export function ActivityPanel() {
     )
   }
 
+  const today = new Date().toISOString().split("T")[0]
+  const acts: any[] = []
+
+  // Đơn nghỉ phép chờ duyệt
+  const pending = (data?.leaves || []).filter((l: any) => l.status === "Cho duyet").slice(0, 2)
+  pending.forEach((l: any) => {
+    acts.push({
+      icon: CalendarDays,
+      iconBg: "bg-amber-100",
+      iconColor: "text-amber-700",
+      title: "Yêu cầu nghỉ phép",
+      description: `${l.full_name} xin nghỉ từ ${l.start_date?.substring(0, 10)} đến ${l.end_date?.substring(0, 10)}`,
+      time: l.created_at ? new Date(l.created_at).toLocaleDateString("vi-VN") : "",
+      href: "/leave",
+    })
+  })
+
+  // Hợp đồng sắp hết hạn
+  if (user?.role !== "employee") {
+    (data?.contracts || []).slice(0, 1).forEach((c: any) => {
+      acts.push({
+        icon: FileText,
+        iconBg: "bg-rose-100",
+        iconColor: "text-rose-700",
+        title: "Hợp đồng sắp hết hạn",
+        description: `Hợp đồng của ${c.full_name} hết hạn ${c.end_date?.substring(0, 10)}`,
+        time: `Hết hạn: ${c.end_date?.substring(0, 10)}`,
+        href: "/contracts",
+      })
+    })
+  }
+
+  // Chấm công hôm nay
+  const todayAtt = (data?.attendance || []).filter((a: any) => a.work_date?.substring(0, 10) === today && a.check_in)
+  acts.push({
+    icon: Clock,
+    iconBg: "bg-emerald-100",
+    iconColor: "text-emerald-700",
+    title: "Chấm công hôm nay",
+    description: `${todayAtt.length} nhân viên đã chấm công hôm nay`,
+    time: "Hôm nay",
+    href: "/attendance",
+  })
+
+  const expiring = (data?.contracts || []).slice(0, 3)
+
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
       <Card className="p-5 lg:col-span-3">
@@ -114,9 +84,9 @@ export function ActivityPanel() {
           <Link href="/leave" className="text-sm font-medium text-primary hover:underline">Xem tất cả</Link>
         </div>
         <ul className="mt-4 flex flex-col gap-1">
-          {activities.length === 0 ? (
+          {acts.length === 0 ? (
             <li className="py-8 text-center text-sm text-muted-foreground">Không có hoạt động nào</li>
-          ) : activities.map((activity, i) => {
+          ) : acts.map((activity, i) => {
             const Icon = activity.icon
             return (
               <li key={i}>

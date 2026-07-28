@@ -126,25 +126,25 @@ function AttendanceDoughnutChart({ stats }: { stats: { dung_gio: number; di_tre:
 export function ReportsPanel() {
   const [activeTab, setActiveTab] = useState<"attendance" | "department" | "leave" | "contract">("attendance")
   const [month, setMonth] = useState(new Date().getMonth() + 1)
-  const [year, setYear]   = useState(new Date().getFullYear())
+  const [year, setYear] = useState(new Date().getFullYear())
 
   const [attendanceData, setAttendanceData] = useState<any[]>([])
   const [departmentData, setDepartmentData] = useState<any[]>([])
-  const [leaveData, setLeaveData]           = useState<any[]>([])
-  const [contractData, setContractData]     = useState<{ summary: any[]; expiring: any[] }>({ summary: [], expiring: [] })
+  const [leaveData, setLeaveData] = useState<any[]>([])
+  const [contractData, setContractData] = useState<{ summary: any[]; expiring: any[] }>({ summary: [], expiring: [] })
 
   const [loadingAttendance, setLoadingAttendance] = useState(false)
   const [loadingDepartment, setLoadingDepartment] = useState(false)
-  const [loadingLeave, setLoadingLeave]           = useState(false)
-  const [loadingContract, setLoadingContract]     = useState(false)
+  const [loadingLeave, setLoadingLeave] = useState(false)
+  const [loadingContract, setLoadingContract] = useState(false)
 
   const [dailyData, setDailyData] = useState<{ date: string; count: number }[]>([])
 
   const stats = {
     dung_gio: attendanceData.reduce((sum, e) => sum + Number(e.on_time || 0), 0),
-    di_tre:   attendanceData.reduce((sum, e) => sum + Number(e.late || 0), 0),
+    di_tre: attendanceData.reduce((sum, e) => sum + Number(e.late || 0), 0),
     vang_mat: attendanceData.reduce((sum, e) => sum + Number(e.absent || 0), 0),
-    ve_som:   attendanceData.reduce((sum, e) => sum + Number(e.early_leave || 0), 0),
+    ve_som: attendanceData.reduce((sum, e) => sum + Number(e.early_leave || 0), 0),
   }
 
   useEffect(() => {
@@ -165,14 +165,14 @@ export function ReportsPanel() {
           .sort((a, b) => a.date.localeCompare(b.date))
         setDailyData(sorted)
       })
-      .catch(() => {})
+      .catch(() => { })
   }, [attendanceData, month, year])
 
-  const totalEmployees   = departmentData.reduce((sum, d) => sum + Number(d.active || 0), 0)
-  const totalAttDays     = attendanceData.reduce((sum, e) => sum + Number(e.total_days || 0), 0)
-  const totalOnTime      = attendanceData.reduce((sum, e) => sum + Number(e.on_time || 0), 0)
-  const attendanceRate   = totalAttDays > 0 ? Math.round((totalOnTime / totalAttDays) * 100) : 0
-  const pendingLeaves    = leaveData.reduce((sum, e) => sum + Number(e.pending || 0), 0)
+  const totalEmployees = departmentData.reduce((sum, d) => sum + Number(d.active || 0), 0)
+  const totalAttDays = attendanceData.reduce((sum, e) => sum + Number(e.total_days || 0), 0)
+  const totalOnTime = attendanceData.reduce((sum, e) => sum + Number(e.on_time || 0), 0)
+  const attendanceRate = totalAttDays > 0 ? Math.round((totalOnTime / totalAttDays) * 100) : 0
+  const pendingLeaves = leaveData.reduce((sum, e) => sum + Number(e.pending || 0), 0)
   const expiringContracts = contractData.expiring.length
 
   useEffect(() => { fetchDepartment(); fetchContract() }, [])
@@ -200,8 +200,8 @@ export function ReportsPanel() {
   const tabs = [
     { key: "attendance", label: "Chấm công", icon: Clock },
     { key: "department", label: "Phòng ban", icon: Users },
-    { key: "leave",      label: "Nghỉ phép", icon: FileText },
-    { key: "contract",   label: "Hợp đồng",  icon: TrendingUp },
+    { key: "leave", label: "Nghỉ phép", icon: FileText },
+    { key: "contract", label: "Hợp đồng", icon: TrendingUp },
   ]
 
   return (
@@ -209,10 +209,10 @@ export function ReportsPanel() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
-          { label: "Tổng nhân viên",   value: totalEmployees || "—",    color: "text-blue-600",    bg: "bg-blue-50" },
-          { label: "Tỷ lệ đúng giờ",   value: totalAttDays > 0 ? `${attendanceRate}%` : "—", color: "text-emerald-600", bg: "bg-emerald-50" },
-          { label: "Đơn chờ duyệt",    value: pendingLeaves || "—",     color: "text-amber-600",   bg: "bg-amber-50" },
-          { label: "HĐ sắp hết hạn",   value: expiringContracts || "—", color: "text-rose-600",    bg: "bg-rose-50" },
+          { label: "Tổng nhân viên", value: totalEmployees || "—", color: "text-blue-600", bg: "bg-blue-50" },
+          { label: "Tỷ lệ đúng giờ", value: totalAttDays > 0 ? `${attendanceRate}%` : "—", color: "text-emerald-600", bg: "bg-emerald-50" },
+          { label: "Đơn chờ duyệt", value: pendingLeaves || "—", color: "text-amber-600", bg: "bg-amber-50" },
+          { label: "HĐ sắp hết hạn", value: expiringContracts || "—", color: "text-rose-600", bg: "bg-rose-50" },
         ].map(item => (
           <Card key={item.label} className="p-5">
             <div className={cn("inline-flex rounded-lg p-2 mb-3", item.bg)}>
@@ -230,7 +230,7 @@ export function ReportsPanel() {
         <select className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none"
           value={month} onChange={e => setMonth(Number(e.target.value))}>
           {Array.from({ length: 12 }, (_, i) => (
-            <option key={i+1} value={i+1}>Tháng {i+1}</option>
+            <option key={i + 1} value={i + 1}>Tháng {i + 1}</option>
           ))}
         </select>
         <select className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none"
@@ -243,7 +243,7 @@ export function ReportsPanel() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 rounded-xl border border-border bg-background p-5">
           <h3 className="text-sm font-semibold mb-4">Chấm công theo ngày</h3>
-          {dailyData.length > 0 
+          {dailyData.length > 0
             ? <AttendanceBarChart data={dailyData} />
             : <p className="text-sm text-muted-foreground text-center py-8">Chưa có dữ liệu</p>
           }
@@ -280,16 +280,16 @@ export function ReportsPanel() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold">Báo cáo chấm công tháng {month}/{year}</h3>
             <Button variant="outline" size="sm" className="gap-2" onClick={() => exportToExcel(
-  attendanceData,
-  [
-    { key: "full_name", label: "Nhân viên" },
-    { key: "department_name", label: "Phòng ban" },
-    { key: "on_time", label: "Đúng giờ" },
-    { key: "late", label: "Đi trễ" },
-    { key: "absent", label: "Vắng mặt" },
-  ],
-  `Cham_cong_thang_${month}_${year}`
-)}><Download className="h-4 w-4" />Xuất Excel</Button>
+              attendanceData,
+              [
+                { key: "full_name", label: "Nhân viên" },
+                { key: "department_name", label: "Phòng ban" },
+                { key: "on_time", label: "Đúng giờ" },
+                { key: "late", label: "Đi trễ" },
+                { key: "absent", label: "Vắng mặt" },
+              ],
+              `Cham_cong_thang_${month}_${year}`
+            )}><Download className="h-4 w-4" />Xuất Excel</Button>
           </div>
           {loadingAttendance ? <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : (
             <div className="overflow-x-auto">
@@ -332,16 +332,16 @@ export function ReportsPanel() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold">Báo cáo nhân sự theo phòng ban</h3>
             <Button variant="outline" size="sm" className="gap-2" onClick={() => exportToExcel(
-  departmentData,
-  [
-    { key: "department_name", label: "Phòng ban" },
-    { key: "manager_name", label: "Trưởng phòng" },
-    { key: "active", label: "Đang làm" },
-    { key: "inactive", label: "Đã nghỉ" },
-    { key: "total_employees", label: "Tổng" },
-  ],
-  "Bao_cao_phong_ban"
-)}><Download className="h-4 w-4" />Xuất Excel</Button>
+              departmentData,
+              [
+                { key: "department_name", label: "Phòng ban" },
+                { key: "manager_name", label: "Trưởng phòng" },
+                { key: "active", label: "Đang làm" },
+                { key: "inactive", label: "Đã nghỉ" },
+                { key: "total_employees", label: "Tổng" },
+              ],
+              "Bao_cao_phong_ban"
+            )}><Download className="h-4 w-4" />Xuất Excel</Button>
           </div>
           {loadingDepartment ? <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : (
             <div className="overflow-x-auto">
@@ -378,16 +378,16 @@ export function ReportsPanel() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold">Báo cáo nghỉ phép tháng {month}/{year}</h3>
             <Button variant="outline" size="sm" className="gap-2" onClick={() => exportToExcel(
-  leaveData.filter(e => e.total_requests > 0),
-  [
-    { key: "full_name", label: "Nhân viên" },
-    { key: "department_name", label: "Phòng ban" },
-    { key: "approved_days", label: "Đã duyệt (ngày)" },
-    { key: "pending", label: "Chờ duyệt" },
-    { key: "rejected", label: "Từ chối" },
-  ],
-  `Nghi_phep_thang_${month}_${year}`
-)}><Download className="h-4 w-4" />Xuất Excel</Button>
+              leaveData.filter(e => e.total_requests > 0),
+              [
+                { key: "full_name", label: "Nhân viên" },
+                { key: "department_name", label: "Phòng ban" },
+                { key: "approved_days", label: "Đã duyệt (ngày)" },
+                { key: "pending", label: "Chờ duyệt" },
+                { key: "rejected", label: "Từ chối" },
+              ],
+              `Nghi_phep_thang_${month}_${year}`
+            )}><Download className="h-4 w-4" />Xuất Excel</Button>
           </div>
           {loadingLeave ? <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : (
             <div className="overflow-x-auto">
@@ -429,9 +429,9 @@ export function ReportsPanel() {
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                 {[
                   { label: "Đang hiệu lực", status: "Dang hieu luc", color: "bg-emerald-50 text-emerald-700" },
-                  { label: "Sắp hết hạn",   status: null,             color: "bg-amber-50 text-amber-700",   value: contractData.expiring.length },
-                  { label: "Đã hết hạn",    status: "Da het han",     color: "bg-rose-50 text-rose-700" },
-                  { label: "Đã chấm dứt",   status: "Da cham dut",    color: "bg-slate-100 text-slate-600" },
+                  { label: "Sắp hết hạn", status: null, color: "bg-amber-50 text-amber-700", value: contractData.expiring.length },
+                  { label: "Đã hết hạn", status: "Da het han", color: "bg-rose-50 text-rose-700" },
+                  { label: "Đã chấm dứt", status: "Da cham dut", color: "bg-slate-100 text-slate-600" },
                 ].map(item => (
                   <div key={item.label} className={cn("rounded-lg p-4 text-center", item.color)}>
                     <p className="text-3xl font-semibold">{item.value ?? contractCount(item.status!)}</p>
