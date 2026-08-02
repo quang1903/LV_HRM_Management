@@ -79,13 +79,13 @@ export default function ScanPage() {
         experimentalFeatures: {
           useBarCodeDetectorIfSupported: true
         }
-      },
+      } as any,
       onScanSuccess,
-      () => {}
+      () => { }
     ).then(() => setScanning(true)).catch(err => {
       setResult({ message: "Không thể mở camera: " + err, success: false })
     })
-    return () => { scanner.stop().catch(() => {}) }
+    return () => { scanner.stop().catch(() => { }) }
   }, [locationStatus, terminalToken])
 
   const handleActivate = async () => {
@@ -113,6 +113,7 @@ export default function ScanPage() {
     if (!coordsRef.current) return
     lastScanRef.current = decodedText
     cooldownRef.current = true
+    scannerRef.current?.pause(true)
     setTimeout(() => { cooldownRef.current = false; lastScanRef.current = "" }, 2500)
 
     const { latitude, longitude } = coordsRef.current
@@ -124,9 +125,7 @@ export default function ScanPage() {
         { qr_value: decodedText, latitude, longitude }, { headers })
       const time = new Date(res.data.check_in).toLocaleTimeString("vi-VN")
       setResult({ message: `Đã vào lúc ${time}`, success: true, name: res.data.full_name })
-      setHistory(prev => [{ name: res.data.full_name, time: `Vào ${time}`, type: "in" }, ...prev].slice(0, 6))
-      scannerRef.current?.pause(true)
-      setTimeout(() => scannerRef.current?.resume(), 2000)
+      setHistory(prev => [{ name: res.data.full_name, time: `Vào ${time}`, type: "in" as const }, ...prev].slice(0, 6))
       setTimeout(() => setResult(null), 4000)
     } catch (err: any) {
       const msg = err.response?.data?.message || ""
@@ -136,16 +135,12 @@ export default function ScanPage() {
             { qr_value: decodedText, latitude, longitude }, { headers })
           const time = new Date(res2.data.check_out).toLocaleTimeString("vi-VN")
           setResult({ message: `Đã ra lúc ${time}`, success: true, name: res2.data.full_name })
-          setHistory(prev => [{ name: res2.data.full_name, time: `Ra ${time}`, type: "out" }, ...prev].slice(0, 6))
-          scannerRef.current?.pause(true)
-          setTimeout(() => scannerRef.current?.resume(), 2000)
+          setHistory(prev => [{ name: res2.data.full_name, time: `Ra ${time}`, type: "out" as const }, ...prev].slice(0, 6))
           setTimeout(() => setResult(null), 4000)
         } catch (err2: any) {
           const msg2 = err2.response?.data?.message || ""
           if (msg2.includes("đã check-out") || msg2.includes("điểm danh")) {
             setResult({ message: `Đã điểm danh đủ hôm nay`, success: true, name: "" })
-            scannerRef.current?.pause(true)
-            setTimeout(() => scannerRef.current?.resume(), 2000)
             setTimeout(() => setResult(null), 4000)
           } else if (err2.response?.status === 401) {
             localStorage.removeItem(TERMINAL_TOKEN_KEY)
@@ -153,8 +148,6 @@ export default function ScanPage() {
             setShowActivate(true)
           } else if (msg2.includes("check-in hợp lệ")) {
             setResult({ message: "Đã điểm danh đủ hôm nay", success: true, name: "" })
-            scannerRef.current?.pause(true)
-            setTimeout(() => scannerRef.current?.resume(), 2000)
             setTimeout(() => setResult(null), 4000)
           } else {
             setResult({ message: msg2 || "Lỗi xử lý", success: false })
@@ -169,6 +162,8 @@ export default function ScanPage() {
         setResult({ message: msg || "Lỗi xử lý", success: false })
         setTimeout(() => setResult(null), 4000)
       }
+    } finally {
+      setTimeout(() => scannerRef.current?.resume(), 2000)
     }
   }
 
@@ -237,7 +232,7 @@ export default function ScanPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4 md:p-6">
       {/* Khung Kiosk nguyên khối viền tối vừa vặn 1024px */}
       <div className="w-full max-w-5xl bg-slate-900/90 border border-slate-800/80 rounded-3xl p-6 shadow-2xl backdrop-blur-xl flex flex-col gap-5">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
           <div className="flex items-center gap-3">
@@ -260,7 +255,7 @@ export default function ScanPage() {
 
         {/* Bố cục Grid 2 Cột */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
+
           {/* CỘT TRÁI: KHUNG CAMERA QUÉT (Chiếm 7/12 cột, cao 380px) */}
           <div className="lg:col-span-7 flex flex-col">
             <style>{`
@@ -299,22 +294,20 @@ export default function ScanPage() {
 
           {/* CỘT PHẢI: THÔNG BÁO RESULT + LỊCH SỬ CHẤM CÔNG (Chiếm 5/12 cột) */}
           <div className="lg:col-span-5 flex flex-col gap-4">
-            
+
             {/* THẺ THÔNG BÁO KẾT QUẢ CHECK-IN / CHECK-OUT */}
             <div className="w-full min-h-[120px]">
               {result ? (
                 <div
-                  className={`relative overflow-hidden rounded-2xl p-4 border shadow-xl transition-all duration-300 animate-in fade-in slide-in-from-top-4 ${
-                    result.success
-                      ? "bg-emerald-950/90 border-emerald-500/60 text-emerald-100"
-                      : "bg-rose-950/90 border-rose-500/60 text-rose-100"
-                  }`}
+                  className={`relative overflow-hidden rounded-2xl p-4 border shadow-xl transition-all duration-300 animate-in fade-in slide-in-from-top-4 ${result.success
+                    ? "bg-emerald-950/90 border-emerald-500/60 text-emerald-100"
+                    : "bg-rose-950/90 border-rose-500/60 text-rose-100"
+                    }`}
                 >
                   <div className="flex items-start gap-3.5">
                     <div
-                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
-                        result.success ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"
-                      }`}
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${result.success ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"
+                        }`}
                     >
                       {result.success ? <CheckCircle2 className="h-6 w-6" /> : <XCircle className="h-6 w-6" />}
                     </div>
@@ -374,11 +367,10 @@ export default function ScanPage() {
                         <span className="font-medium text-slate-200 truncate">{h.name}</span>
                       </div>
                       <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                          h.type === "in"
-                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                            : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                        }`}
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${h.type === "in"
+                          ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                          : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                          }`}
                       >
                         {h.time}
                       </span>

@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import Chart from "chart.js/auto"
 import { attendanceService } from "@/services/attendance"
 import { exportToExcel } from "@/lib/exportExcel"
 import { Download, Users, Clock, FileText, TrendingUp, Loader2 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { cn, formatDate } from "@/lib/utils"
 import { reportService } from "@/services/report"
 
 function AttendanceBarChart({ data }: { data: { date: string; count: number }[] }) {
@@ -140,12 +140,12 @@ export function ReportsPanel() {
 
   const [dailyData, setDailyData] = useState<{ date: string; count: number }[]>([])
 
-  const stats = {
+  const stats = useMemo(() => ({
     dung_gio: attendanceData.reduce((sum, e) => sum + Number(e.on_time || 0), 0),
     di_tre: attendanceData.reduce((sum, e) => sum + Number(e.late || 0), 0),
     vang_mat: attendanceData.reduce((sum, e) => sum + Number(e.absent || 0), 0),
     ve_som: attendanceData.reduce((sum, e) => sum + Number(e.early_leave || 0), 0),
-  }
+  }), [attendanceData])
 
   useEffect(() => {
     if (!attendanceData.length) {
@@ -461,7 +461,7 @@ export function ReportsPanel() {
                         <td className="px-4 py-3 font-medium">{c.full_name}</td>
                         <td className="px-4 py-3 text-muted-foreground font-mono text-xs">{c.employee_code}</td>
                         <td className="px-4 py-3 text-muted-foreground">{c.contract_type}</td>
-                        <td className="px-4 py-3 text-amber-600 font-medium">{c.end_date?.substring(0, 10)}</td>
+                        <td className="px-4 py-3 text-amber-600 font-medium">{formatDate(c.end_date)}</td>
                       </tr>
                     ))}
                   </tbody>

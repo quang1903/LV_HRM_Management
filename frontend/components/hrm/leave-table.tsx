@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Search, Plus, X, Eye, Loader2 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { cn, formatDate } from "@/lib/utils"
 import { useAuth } from "@/context/AuthContext"
 import { leaveService } from "@/services/leave"
 
@@ -260,8 +260,8 @@ export function LeaveTable() {
                       {typeLabel[leave.request_type] || leave.request_type}
                     </span>
                   </td>
-                  <td className="px-5 py-4 text-muted-foreground">{leave.start_date?.substring(0, 10)}</td>
-                  <td className="px-5 py-4 text-muted-foreground">{leave.end_date?.substring(0, 10)}</td>
+                  <td className="px-5 py-4 text-muted-foreground">{formatDate(leave.start_date)}</td>
+                  <td className="px-5 py-4 text-muted-foreground">{formatDate(leave.end_date)}</td>
                   <td className="px-5 py-4 font-medium">{leave.total_days} ngày</td>
                   <td className="px-5 py-4">
                     <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset", statusStyles[leave.status] || "bg-gray-50 text-gray-600")}>
@@ -323,8 +323,8 @@ export function LeaveTable() {
                   { label: "Nhân viên", value: viewLeave.full_name },
                   { label: "Phòng ban", value: viewLeave.department_name },
                   { label: "Loại đơn", value: typeLabel[viewLeave.request_type] || viewLeave.request_type },
-                  { label: "Từ ngày", value: viewLeave.start_date?.substring(0, 10) },
-                  { label: "Đến ngày", value: viewLeave.end_date?.substring(0, 10) },
+                  { label: "Từ ngày", value: formatDate(viewLeave.start_date) },
+                  { label: "Đến ngày", value: formatDate(viewLeave.end_date) },
                   { label: "Số ngày", value: `${viewLeave.total_days} ngày` },
                   { label: "Lý do", value: viewLeave.reason },
                   { label: "Trạng thái", value: statusLabel[viewLeave.status] || viewLeave.status },

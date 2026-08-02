@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Pencil, Trash2, Search, Plus, X, Loader2, AlertTriangle } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { cn, formatDate } from "@/lib/utils"
 import { useAuth } from "@/context/AuthContext"
 import { contractService } from "@/services/contract"
 import { employeeService } from "@/services/employee"
@@ -219,8 +219,8 @@ export function ContractTable() {
                       </div>
                     </td>
                     <td className="px-5 py-4 text-muted-foreground">{contract.contract_type}</td>
-                    <td className="px-5 py-4 text-muted-foreground">{contract.start_date?.substring(0, 10)}</td>
-                    <td className="px-5 py-4 text-muted-foreground">{contract.end_date?.substring(0, 10) || "Không xác định"}</td>
+                    <td className="px-5 py-4 text-muted-foreground">{formatDate(contract.start_date)}</td>
+                    <td className="px-5 py-4 text-muted-foreground">{contract.end_date ? formatDate(contract.end_date) : "Không xác định"}</td>
                     <td className="px-5 py-4 font-medium">{formatSalary(contract.salary)} đ</td>
                     <td className="px-5 py-4">
                       <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset", statusStyles[display.key] || "bg-slate-100 text-slate-600")}>

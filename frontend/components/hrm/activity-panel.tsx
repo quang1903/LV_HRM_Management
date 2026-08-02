@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { Card } from "@/components/ui/card"
 import { CalendarDays, FileText, Clock, Loader2 } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, formatDate } from "@/lib/utils"
 import { useAuth } from "@/context/AuthContext"
 
 interface Props {
@@ -38,7 +38,7 @@ export function ActivityPanel({ data }: Props) {
       iconBg: "bg-amber-100",
       iconColor: "text-amber-700",
       title: "Yêu cầu nghỉ phép",
-      description: `${l.full_name} xin nghỉ từ ${l.start_date?.substring(0, 10)} đến ${l.end_date?.substring(0, 10)}`,
+      description: `${l.full_name} xin nghỉ từ ${formatDate(l.start_date)} đến ${formatDate(l.end_date)}`,
       time: l.created_at ? new Date(l.created_at).toLocaleDateString("vi-VN") : "",
       href: "/leave",
     })
@@ -52,8 +52,8 @@ export function ActivityPanel({ data }: Props) {
         iconBg: "bg-rose-100",
         iconColor: "text-rose-700",
         title: "Hợp đồng sắp hết hạn",
-        description: `Hợp đồng của ${c.full_name} hết hạn ${c.end_date?.substring(0, 10)}`,
-        time: `Hết hạn: ${c.end_date?.substring(0, 10)}`,
+        description: `Hợp đồng của ${c.full_name} hết hạn ${formatDate(c.end_date)}`,
+        time: `Hết hạn: ${formatDate(c.end_date)}`,
         href: "/contracts",
       })
     })
@@ -125,7 +125,7 @@ export function ActivityPanel({ data }: Props) {
               </div>
               <div className="flex flex-col leading-tight">
                 <span className="text-sm font-medium">{c.full_name}</span>
-                <span className="text-xs text-muted-foreground">Hết hạn: {c.end_date?.substring(0, 10)}</span>
+                <span className="text-xs text-muted-foreground">Hết hạn: {formatDate(c.end_date)}</span>
               </div>
             </li>
           ))}

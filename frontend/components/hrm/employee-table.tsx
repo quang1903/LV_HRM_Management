@@ -6,7 +6,7 @@ import * as XLSX from "xlsx"
 import { exportToExcel } from "@/lib/exportExcel"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { cn, formatDate } from "@/lib/utils"
 import { useAuth } from "@/context/AuthContext"
 import { employeeService } from "@/services/employee"
 import { departmentService } from "@/services/department"
@@ -634,8 +634,8 @@ export function EmployeeTable({
                   { label: "SĐT", value: viewEmployee.phone || "—" },
                   { label: "Phòng ban", value: viewEmployee.department_name || "—" },
                   { label: "Chức vụ", value: viewEmployee.position_name || "—" },
-                  { label: "Ngày vào", value: viewEmployee.hire_date?.substring(0, 10) },
-                  { label: "Ngày sinh", value: viewEmployee.birth_date?.substring(0, 10) || "—" },
+                  { label: "Ngày vào", value: formatDate(viewEmployee.hire_date) },
+                  { label: "Ngày sinh", value: formatDate(viewEmployee.birth_date) },
                   { label: "Giới tính", value: viewEmployee.gender === "Nam" ? "Nam" : viewEmployee.gender === "Nu" ? "Nữ" : viewEmployee.gender || "—" },
                   ...(user?.role === "admin" || user?.role === "hr" ? [
                     { label: "CCCD", value: viewEmployee.id_card || "—" },
