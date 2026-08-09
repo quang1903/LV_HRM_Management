@@ -12,7 +12,7 @@ import { employeeService } from "@/services/employee"
 import { departmentService } from "@/services/department"
 import { positionService } from "@/services/position"
 
-
+//Định dạng dữ liệu 1 Nhân viên trên Frontend
 type Employee = {
   id: number
   employee_code: string
@@ -33,6 +33,7 @@ type Employee = {
 
 type Department = { id: number; name: string }
 
+// Màu sắc Badge trạng thái (Đang làm = Xanh lá, Đã nghỉ = Xám, Tạm nghỉ = Vàng)
 const statusStyles: Record<string, string> = {
   "Dang lam": "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
   "Nghi viec": "bg-slate-100 text-slate-600 ring-slate-500/20",
@@ -52,13 +53,21 @@ function getInitials(name: string) {
 const MONTHS_VI = ["Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"]
 const DAYS_VI = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"]
 
+//Lịch chọn ngày sinh với tiếng Việt & chuyển năm 
 function CalendarPicker({ value, onChange }: { value: string; onChange: (val: string) => void }) {
+  // Tạo đối tượng Date hiện tại
   const today = new Date()
+  // Tạo đối tượng Date từ chuỗi ngày tháng
   const parsed = value ? new Date(value) : null
+  // Khởi tạo state để hiển thị năm (lấy từ ngày tháng hiện tại hoặc ngày tháng được chọn)
   const [viewYear, setViewYear] = useState(parsed?.getFullYear() || today.getFullYear() - 25)
+  // Khởi tạo state để hiển thị tháng (lấy từ ngày tháng hiện tại hoặc ngày tháng được chọn)
   const [viewMonth, setViewMonth] = useState(parsed?.getMonth() || 0)
+  // State để mở/đóng lịch
   const [open, setOpen] = useState(false)
+  // State để xác định chế độ hiển thị (ngày/tháng/năm)
   const [mode, setMode] = useState<"day" | "month" | "year">("day")
+  //giúp phát hiện click bên ngoài để đóng lịch
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -198,6 +207,7 @@ function CalendarPicker({ value, onChange }: { value: string; onChange: (val: st
   )
 }
 
+//Xử lý Tìm kiếm / Lọc danh sách
 export function EmployeeTable({
   initialEmployees,
   initialDepartments,
@@ -205,18 +215,23 @@ export function EmployeeTable({
   initialEmployees?: any[]
   initialDepartments?: any[]
 } = {}) {
+  // Lấy thông tin người dùng đang đăng nhập và kiểm tra quyền Edit 
   const { user } = useAuth()
   const canEdit = user?.role === "admin" || user?.role === "hr"
-
+  // Khai báo các State quản lý danh sách & Modal
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees || [])
   const [departments, setDepartments] = useState<Department[]>(initialDepartments || [])
   const [loading, setLoading] = useState(!initialEmployees)
   const [search, setSearch] = useState("")
-  const [showInactive, setShowInactive] = useState(false)
+  const [showInactive, setShowInactive] = useState(false)// Toggle xem Nhân viên đang làm hay đã nghỉ việc
+
+  // State lưu đối tượng nhân viên đang được Chọn Xem / Chọn Sửa / Chọn Vô hiệu hóa / Chọn Xóa vĩnh viễn
   const [viewEmployee, setViewEmployee] = useState<Employee | null>(null)
   const [editEmployee, setEditEmployee] = useState<Employee | null>(null)
   const [deleteEmployee, setDeleteEmployee] = useState<Employee | null>(null)
   const [permanentDeleteEmployee, setPermanentDeleteEmployee] = useState<Employee | null>(null)
+
+  // State quản lý danh sách Chức vụ theo Phòng ban và Form Thêm mới
   const [positions, setPositions] = useState<any[]>([])
   const [editPositions, setEditPositions] = useState<any[]>([])
   const [showAdd, setShowAdd] = useState(false)
@@ -225,10 +240,23 @@ export function EmployeeTable({
     department_id: "", position_id: "", hire_date: "", gender: "Nam", birth_date: "", address: "",
     id_card: ""
   })
+
+  // State lưu thông tin Cảnh báo Thay thế Trưởng phòng (Khi thêm/sửa nhân viên vào vị trí Trưởng phòng đang có người giữ)
+  const [confirmReplace, setConfirmReplace] = useState<{
+    old_manager_name: string
+    old_manager_id: number
+    regular_positions: { id: number; name: string }[]
+    new_position_id: string
+    message: string
+    mode: "add" | "edit"
+  } | null>(null)
+
   const [importing, setImporting] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
-  const [importResult, setImportResult] = useState<{ successCount: number; totalRows: number; errors: string[] } | null>(null)
+  const [importResult, setImportResult] = useState<{ successCount: number; totalRows: number; errors: string[]; warnings?: string[] } | null>(null)
 
+
+  //Tải danh sách nhân viên & phòng ban từ Server khi giao diện mở ra
   useEffect(() => {
     if (initialEmployees && initialEmployees.length > 0) {
       setEmployees(initialEmployees)
@@ -256,7 +284,7 @@ export function EmployeeTable({
     }
   }
 
-
+  // Tự động lọc theo từ khóa tìm kiếm (Tên, Mã NV, Phòng ban) & Trạng thái làm việc
   const filtered = employees.filter(e => {
     const matchSearch =
       e.full_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -266,7 +294,7 @@ export function EmployeeTable({
     return matchSearch && matchStatus
   })
 
-  // Khi chọn phòng ban trong modal Thêm
+//Khi chọn phòng ban trong modal Thêm -> Tự động gọi API lấy danh sách chức vụ tương ứng của phòng đó
   const handleDeptChange = async (deptId: string) => {
     setNewEmployee({ ...newEmployee, department_id: deptId, position_id: "" })
     if (deptId) {
@@ -279,7 +307,8 @@ export function EmployeeTable({
     }
   }
 
-  const handleEdit = async () => {
+  // HÀM CẬP NHẬT NHÂN VIÊN
+  const handleEdit = async (confirmReplace_ = false, newPositionForOld: string | null = null) => {
     if (!editEmployee) return
     try {
       await employeeService.update(editEmployee.id, {
@@ -292,13 +321,31 @@ export function EmployeeTable({
         gender: editEmployee.gender,
         birth_date: editEmployee.birth_date,
         address: editEmployee.address,
+        confirm_replace_manager: confirmReplace_,
+        new_position_for_old_manager: newPositionForOld ? Number(newPositionForOld) : null,
       })
       setEditEmployee(null)
-      fetchEmployees()
+      setConfirmReplace(null)
+      fetchEmployees()// Tải lại danh sách sau khi sửa thành công
     } catch (err: any) {
+      // Nếu Backend trả lỗi 409 (Phong ban này đã có Trưởng phòng) -> Bật Modal Hỏi xác nhận thay thế
+      if (err.response?.status === 409 && err.response?.data?.need_confirm) {
+        const d = err.response.data
+        setConfirmReplace({
+          old_manager_name: d.old_manager_name,
+          old_manager_id: d.old_manager_id,
+          regular_positions: d.regular_positions || [],
+          new_position_id: "",
+          message: d.message,
+          mode: "edit",
+        })
+        return
+      }
       alert(err.response?.data?.message || "Lỗi khi cập nhật nhân viên")
     }
   }
+
+  // KÍCH HOẠT NHÂN VIÊN (Chuyển về trạng thái 'Dang lam')
   const handleActivate = async (id: number) => {
     try {
       await employeeService.activate(id)
@@ -308,6 +355,7 @@ export function EmployeeTable({
     }
   }
 
+  // VÔ HIỆU HÓA NHÂN VIÊN (Chuyển trạng thái sang 'Nghi viec')
   const handleDelete = async () => {
     if (!deleteEmployee) return
     try {
@@ -319,6 +367,7 @@ export function EmployeeTable({
     }
   }
 
+  // XÓA VĨNH VIỄN NHÂN VIÊN (Xóa hẳn bản ghi trong MySQL DB)
   const handlePermanentDelete = async () => {
     if (!permanentDeleteEmployee) return
     try {
@@ -330,7 +379,9 @@ export function EmployeeTable({
     }
   }
 
-  const handleAdd = async () => {
+  // HÀM THÊM MỚI NHÂN VIÊN
+  const handleAdd = async (confirmReplace_ = false, newPositionForOld: string | null = null) => {
+    // Validate thông tin bắt buộc
     if (!newEmployee.full_name || !newEmployee.email || !newEmployee.hire_date) {
       alert("Vui lòng nhập đầy đủ thông tin bắt buộc")
       return
@@ -340,12 +391,15 @@ export function EmployeeTable({
       alert("Email không đúng định dạng (ví dụ: ten@company.com)")
       return
     }
+    // Cảnh báo khi chưa chọn phòng ban
     if (!newEmployee.department_id) {
       const confirmed = window.confirm(
         "⚠️ Nhân viên này chưa được gán phòng ban.\n\nHậu quả:\n• Nhân viên sẽ không xuất hiện trong danh sách của bất kỳ Quản lý nào\n• Dữ liệu chấm công vẫn được lưu nhưng chỉ Admin/HR mới thấy\n\nBạn vẫn muốn tiếp tục?"
       )
       if (!confirmed) return
     }
+
+    // Tự động tính toán mã nhân viên tiếp theo (VD: EMP001 -> EMP002)
     const maxCode = employees.reduce((max, e) => {
       const num = parseInt(e.employee_code?.replace("EMP", "") || "0")
       return num > max ? num : max
@@ -357,16 +411,32 @@ export function EmployeeTable({
         employee_code,
         department_id: newEmployee.department_id ? Number(newEmployee.department_id) : null,
         position_id: newEmployee.position_id ? Number(newEmployee.position_id) : null,
+        confirm_replace_manager: confirmReplace_,
+        new_position_for_old_manager: newPositionForOld ? Number(newPositionForOld) : null,
       })
       setShowAdd(false)
+      setConfirmReplace(null)
       setNewEmployee({ employee_code: "", full_name: "", email: "", phone: "", department_id: "", position_id: "", hire_date: "", gender: "Nam", birth_date: "", address: "", id_card: "" })
       setPositions([])
       fetchEmployees()
     } catch (err: any) {
+      if (err.response?.status === 409 && err.response?.data?.need_confirm) {
+        const d = err.response.data
+        setConfirmReplace({
+          old_manager_name: d.old_manager_name,
+          old_manager_id: d.old_manager_id,
+          regular_positions: d.regular_positions || [],
+          new_position_id: "",
+          message: d.message,
+          mode: "add",
+        })
+        return
+      }
       alert(err.response?.data?.message || "Lỗi khi thêm nhân viên")
     }
   }
 
+  // XUẤT FILE EXCEL
   const handleExportFile = (data: Employee[]) => {
     if (data.length === 0) {
       alert("Không có dữ liệu để xuất")
@@ -388,6 +458,7 @@ export function EmployeeTable({
     )
   }
 
+  // TẢI FILE EXCEL MẪU DÀNH CHO IMPORT
   const handleDownloadTemplate = () => {
     const sampleData = [
       {
@@ -414,6 +485,7 @@ export function EmployeeTable({
     XLSX.writeFile(wb, "Mau_Import_Nhan_Vien.xlsx")
   }
 
+  // ĐỌC VÀ ĐẨY FILE EXCEL NHẬP HÀNG LOẠT
   const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -443,6 +515,7 @@ export function EmployeeTable({
     }
   }
 
+  // Nếu dữ liệu đang tải -> Hiển thị icon xoay xoay Loading
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -454,12 +527,16 @@ export function EmployeeTable({
   return (
     <>
       <Card className="overflow-hidden p-0">
+        {/* THANH CÔNG CỤ TÌM KIẾM, NÚT XUẤT/NHẬP EXCEL & NÚT THÊM MỚI */}
         <div className="flex flex-col gap-4 border-b border-border p-5 md:flex-row md:items-center md:justify-between">
+          {/* Tiêu đề */}
           <div>
             <h2 className="text-base font-semibold">Danh sách nhân viên</h2>
             <p className="text-sm text-muted-foreground">Quản lý thông tin và trạng thái của tất cả nhân viên</p>
           </div>
+          {/* Nút tìm kiếm và các nút chức năng */}
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            {/* Ô tìm kiếm */}
             <div className="relative w-full sm:w-auto">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -470,10 +547,12 @@ export function EmployeeTable({
                 className="h-9 w-full min-w-0 rounded-md border border-input bg-background pl-9 pr-3 text-sm outline-none ring-ring/40 focus:ring-2 md:w-56"
               />
             </div>
+            {/* Nút Toggle lọc "Đang làm" / "Đã nghỉ" */}
             <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowInactive(!showInactive)}>
               {showInactive ? "Xem đang làm" : "Xem đã nghỉ"}
             </Button>
             <div className="relative">
+              {/* Nút Xuất file Excel */}
               <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowExportMenu(!showExportMenu)}>
                 <Download className="h-4 w-4" />Xuất file
               </Button>
@@ -499,6 +578,7 @@ export function EmployeeTable({
                 </>
               )}
             </div>
+            {/* Nút Nhập Excel & Thêm mới (Chỉ hiển thị với Admin / HR) */}
             {canEdit && (
               <>
                 <Button variant="outline" size="sm" className="gap-2" onClick={handleDownloadTemplate}>
@@ -517,6 +597,7 @@ export function EmployeeTable({
           </div>
         </div>
 
+        {/* BẢNG HIỂN THỊ DANH SÁCH NHÂN VIÊN */}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-sm">
             <thead className="bg-muted/50">
@@ -560,6 +641,7 @@ export function EmployeeTable({
                       {statusLabel[employee.status] || employee.status}
                     </span>
                   </td>
+                  {/* CỘT NÚT THAO TÁC (Xem, Sửa, Vô hiệu hóa, Kích hoạt lại, Xóa vĩnh viễn) */}
                   <td className="px-5 py-4">
                     <div className="flex items-center justify-end gap-1">
                       <button type="button" onClick={() => setViewEmployee(employee)} className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground">
@@ -614,7 +696,7 @@ export function EmployeeTable({
         </div>
       </Card>
 
-      {/* Modal Xem */}
+      {/* XEM CHI TIẾT NHÂN VIÊN */}
       {viewEmployee && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50">
           <div className="flex min-h-full items-center justify-center p-4">
@@ -628,6 +710,7 @@ export function EmployeeTable({
                   {getInitials(viewEmployee.full_name)}
                 </div>
                 <p className="text-center font-semibold text-lg">{viewEmployee.full_name}</p>
+                {/* Liệt kê chi tiết từng thuộc tính */}
                 {[
                   { label: "Mã NV", value: viewEmployee.employee_code },
                   { label: "Email", value: viewEmployee.email },
@@ -689,6 +772,7 @@ export function EmployeeTable({
                     onChange={e => setEditEmployee({ ...editEmployee!, email: e.target.value })}
                   />
                 </div>
+                {/* Chọn Phòng ban -> Tự động load danh sách Chức vụ tương ứng */}
                 <div>
                   <label className="text-sm text-muted-foreground">Phòng ban</label>
                   <select
@@ -709,6 +793,7 @@ export function EmployeeTable({
                     {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
                 </div>
+                {/* Chọn Chức vụ */}
                 <div>
                   <label className="text-sm text-muted-foreground">Chức vụ</label>
                   <select
@@ -721,6 +806,7 @@ export function EmployeeTable({
                     {editPositions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
+                {/* Chọn Giới tính, Ngày sinh, CCCD */}
                 <div>
                   <label className="text-sm text-muted-foreground">Giới tính</label>
                   <select
@@ -749,16 +835,17 @@ export function EmployeeTable({
                   />
                 </div>
               </div>
+              {/* Hủy & Lưu */}
               <div className="flex gap-2 mt-4">
                 <Button variant="outline" className="flex-1" onClick={() => setEditEmployee(null)}>Hủy</Button>
-                <Button className="flex-1" onClick={handleEdit}>Lưu</Button>
+                <Button className="flex-1" onClick={() => handleEdit()}>Lưu</Button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal Xóa */}
+      {/* MODAL POPUP VÔ HIỆU HÓA NHÂN VIÊN */}
       {deleteEmployee && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50">
           <div className="flex min-h-full items-center justify-center p-4">
@@ -790,6 +877,7 @@ export function EmployeeTable({
                 <h3 className="text-lg font-semibold">Thêm nhân viên mới</h3>
                 <button onClick={() => setShowAdd(false)}><X className="h-5 w-5" /></button>
               </div>
+              {/* Nhập Họ tên và SĐT -> Tạo tài khoản tự động */}
               <div className="flex flex-col gap-3">
                 {[
                   { label: "Họ tên *", field: "full_name" },
@@ -804,6 +892,7 @@ export function EmployeeTable({
                     />
                   </div>
                 ))}
+                {/* Nhập Email, Ngày vào làm, Phòng ban, Chức vụ */}
                 <div>
                   <label className="text-sm text-muted-foreground">Email *</label>
                   <input
@@ -814,6 +903,7 @@ export function EmployeeTable({
                     onChange={e => setNewEmployee({ ...newEmployee, email: e.target.value })}
                   />
                 </div>
+                
                 <div>
                   <label className="text-sm text-muted-foreground">Ngày vào làm *</label>
                   <input
@@ -846,6 +936,7 @@ export function EmployeeTable({
                     {positions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
+
                 <div>
                   <label className="text-sm text-muted-foreground">Giới tính</label>
                   <select
@@ -865,6 +956,7 @@ export function EmployeeTable({
                     onChange={val => setNewEmployee({ ...newEmployee, birth_date: val })}
                   />
                 </div>
+
                 <div>
                   <label className="text-sm text-muted-foreground">CCCD</label>
                   <input
@@ -884,6 +976,7 @@ export function EmployeeTable({
                   />
                 </div>
               </div>
+              {/* Cảnh báo khi chưa chọn phòng ban */}
               {!newEmployee.department_id && (
                 <div className="flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700 ring-1 ring-inset ring-amber-600/20">
                   <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
@@ -892,7 +985,7 @@ export function EmployeeTable({
               )}
               <div className="flex gap-2 mt-4">
                 <Button variant="outline" className="flex-1" onClick={() => setShowAdd(false)}>Hủy</Button>
-                <Button className="flex-1" onClick={handleAdd}>Thêm</Button>
+                <Button className="flex-1" onClick={() => handleAdd()}>Thêm</Button>
               </div>
             </div>
           </div>
@@ -900,8 +993,50 @@ export function EmployeeTable({
       )}
 
 
+      {/* XÁC NHẬN KHI CHUYỂN PHÒNG BAN */}
+      {confirmReplace && (
+        <div className="fixed inset-0 z-[60] overflow-y-auto bg-black/50">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-lg">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-50">
+                  <AlertTriangle className="h-5 w-5 text-amber-600" />
+                </div>
+                <h3 className="text-lg font-semibold">Xác nhận thay thế Trưởng phòng</h3>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">{confirmReplace.message}</p>
 
-      {/* Modal Xóa chính thức */}
+              <div>
+                <label className="text-sm text-muted-foreground">
+                  Chức vụ mới cho "{confirmReplace.old_manager_name}"
+                </label>
+                <select
+                  className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
+                  value={confirmReplace.new_position_id}
+                  onChange={e => setConfirmReplace({ ...confirmReplace, new_position_id: e.target.value })}
+                >
+                  <option value="">-- Chờ phân công (không chức vụ) --</option>
+                  {confirmReplace.regular_positions.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-2 mt-4">
+                <Button variant="outline" className="flex-1" onClick={() => setConfirmReplace(null)}>Hủy</Button>
+                <Button className="flex-1" onClick={() => {
+                  if (confirmReplace.mode === "add") {
+                    handleAdd(true, confirmReplace.new_position_id)
+                  } else {
+                    handleEdit(true, confirmReplace.new_position_id)
+                  }
+                }}>Xác nhận thay thế</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* XÓA VĨNH VIỄN (Admin) */}
       {permanentDeleteEmployee && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50">
           <div className="flex min-h-full items-center justify-center p-4">
@@ -924,6 +1059,7 @@ export function EmployeeTable({
         </div>
       )}
 
+      {/* KẾT QUẢ NHẬP EXCEL */}
       {importResult && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50">
           <div className="flex min-h-full items-center justify-center p-4">
@@ -937,9 +1073,17 @@ export function EmployeeTable({
                   Nhập thành công {importResult.successCount}/{importResult.totalRows} dòng
                 </p>
               </div>
+              {importResult.warnings && importResult.warnings.length > 0 && (
+                <div className="rounded-md bg-amber-50 p-3 mb-3 max-h-48 overflow-y-auto">
+                  <p className="text-sm font-medium text-amber-700 mb-2">⚠ {importResult.warnings.length} cảnh báo (vẫn tạo thành công):</p>
+                  <ul className="text-sm text-amber-700 flex flex-col gap-1">
+                    {importResult.warnings.map((w, i) => <li key={i}>• {w}</li>)}
+                  </ul>
+                </div>
+              )}
               {importResult.errors.length > 0 && (
-                <div className="rounded-md bg-rose-50 p-3 max-h-60 overflow-y-auto">
-                  <p className="text-sm font-medium text-rose-700 mb-2">{importResult.errors.length} dòng bị lỗi:</p>
+                <div className="rounded-md bg-rose-50 p-3 max-h-48 overflow-y-auto">
+                  <p className="text-sm font-medium text-rose-700 mb-2">✕ {importResult.errors.length} dòng bị lỗi (không tạo được):</p>
                   <ul className="text-sm text-rose-600 flex flex-col gap-1">
                     {importResult.errors.map((err, i) => <li key={i}>• {err}</li>)}
                   </ul>

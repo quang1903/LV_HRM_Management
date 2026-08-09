@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext"
 import { employeeService } from "@/services/employee"
 import { profileRequestService } from "@/services/profileRequest"
 
+//tạo giới tính
 const genderLabel: Record<string, string> = { Nam: "Nam", Nu: "Nữ", Khac: "Khác" }
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
@@ -17,12 +18,19 @@ const statusConfig: Record<string, { label: string; color: string; icon: any }> 
 }
 
 export function MyProfileInfo() {
+  // Lấy thông tin user hiện tại từ AuthContext
   const { user } = useAuth()
+  //lưu trữ toàn bộ thông tin chi tiết hồ sơ nhân viên (Họ tên, SĐT, Địa chỉ, Phòng ban, Chức vụ...)
   const [employee, setEmployee] = useState<any>(null)
+  //Biến trạng thái tải dữ liệu
   const [loading, setLoading] = useState(true)
+  //Trạng thái chỉnh sửa thông tin
   const [editing, setEditing] = useState(false)
+  //Lưu trữ thông tin đang chỉnh sửa (Số điện thoại, Địa chỉ)
   const [form, setForm] = useState({ phone: "", address: "" })
+  //Trạng thái lưu
   const [saving, setSaving] = useState(false)
+  //Lưu trữ danh sách các yêu cầu thay đổi
   const [myRequests, setMyRequests] = useState<any[]>([])
 
   useEffect(() => {
@@ -43,9 +51,10 @@ export function MyProfileInfo() {
       setMyRequests(res.data)
     } catch {}
   }
-
+//hàm tạo ảnh đại diện từ tên (2 chữ cái đầu viết hoa)
   const getInitials = (name: string) => name?.split(" ").map((w: string) => w[0]).slice(-2).join("").toUpperCase() || "?"
 
+  //HÀM GỬI YÊU CẦU ĐỔI SĐT / ĐỊA CHỈ
   const handleSubmitRequest = async () => {
     if (!employee) return
     const changes: { field: string; value: string }[] = []
@@ -64,7 +73,7 @@ export function MyProfileInfo() {
     try {
       setSaving(true)
       for (const change of changes) {
-        await profileRequestService.create(change.field, change.value)
+        await profileRequestService.create(change.field, change.value) // Gửi API tạo request
       }
       alert(`Đã gửi ${changes.length} yêu cầu thay đổi, vui lòng chờ HR duyệt`)
       setEditing(false)
@@ -80,33 +89,42 @@ export function MyProfileInfo() {
     return <Card className="p-6 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></Card>
   }
 
+  // Hiện thông báo nếu tk chưa gắn với hồ sơ nhân viên
   if (!employee) {
     return <Card className="p-6 text-center text-muted-foreground">Tài khoản chưa được gắn với hồ sơ nhân viên</Card>
   }
 
+  // Lấy tập hợp các trường đang nằm trong danh sách 'Cho duyet'
   const pendingFields = new Set(myRequests.filter(r => r.status === "Cho duyet").map(r => r.field_name))
 
   return (
     <Card className="p-6">
+      {/* Thông tin Họ tên, Mã NV, Email, Giới tính, Ngày sinh... */}
       <div className="flex items-center gap-4 mb-6">
+        {/* Ảnh đại diện */}
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-xl font-semibold text-primary">
           {getInitials(employee.full_name)}
         </div>
+        {/* Họ tên và chức vụ + phòng ban*/}
         <div>
           <p className="text-lg font-semibold">{employee.full_name}</p>
           <p className="text-sm text-muted-foreground">{employee.position_name || "—"} · {employee.department_name || "—"}</p>
         </div>
       </div>
-
+      
+      {/* Thông tin Họ tên, Mã NV, Email, Giới tính, Ngày sinh... */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Mã nhân viên */}
         <div>
           <label className="text-sm text-muted-foreground">Mã nhân viên</label>
           <p className="mt-1 h-9 flex items-center px-3 text-sm font-mono bg-muted/50 rounded-md border border-input">{employee.employee_code}</p>
         </div>
+        {/* Email */}
         <div>
           <label className="text-sm text-muted-foreground">Email</label>
           <p className="mt-1 h-9 flex items-center px-3 text-sm bg-muted/50 rounded-md border border-input">{employee.email}</p>
         </div>
+        {/* Số điện thoại (có thể chỉnh sửa nếu có quyền) */}
         <div>
           <label className="text-sm text-muted-foreground">
             SĐT {pendingFields.has("phone") && <span className="text-amber-600">(đang chờ duyệt)</span>}
@@ -120,10 +138,12 @@ export function MyProfileInfo() {
             <p className="mt-1 h-9 flex items-center px-3 text-sm bg-muted/50 rounded-md border border-input">{employee.phone || "—"}</p>
           )}
         </div>
+        {/* Giới tính */}
         <div>
           <label className="text-sm text-muted-foreground">Giới tính</label>
           <p className="mt-1 h-9 flex items-center px-3 text-sm bg-muted/50 rounded-md border border-input">{genderLabel[employee.gender] || "—"}</p>
         </div>
+        {/* Địa chỉ (có thể chỉnh sửa nếu có quyền) */}
         <div className="sm:col-span-2">
           <label className="text-sm text-muted-foreground">
             Địa chỉ {pendingFields.has("address") && <span className="text-amber-600">(đang chờ duyệt)</span>}
@@ -137,14 +157,17 @@ export function MyProfileInfo() {
             <p className="mt-1 h-9 flex items-center px-3 text-sm bg-muted/50 rounded-md border border-input">{employee.address || "—"}</p>
           )}
         </div>
+        {/* Ngày sinh */}
         <div>
           <label className="text-sm text-muted-foreground">Ngày sinh</label>
           <p className="mt-1 h-9 flex items-center px-3 text-sm bg-muted/50 rounded-md border border-input">{employee.birth_date?.substring(0, 10) || "—"}</p>
         </div>
+        {/* CCCD */}
         <div>
           <label className="text-sm text-muted-foreground">CCCD</label>
           <p className="mt-1 h-9 flex items-center px-3 text-sm bg-muted/50 rounded-md border border-input">{employee.id_card || "—"}</p>
         </div>
+        {/* Ngày vào làm */}
         <div>
           <label className="text-sm text-muted-foreground">Ngày vào làm</label>
           <p className="mt-1 h-9 flex items-center px-3 text-sm bg-muted/50 rounded-md border border-input">{employee.hire_date?.substring(0, 10)}</p>
@@ -158,7 +181,9 @@ export function MyProfileInfo() {
       <div className="flex gap-2 mt-4">
         {editing ? (
           <>
+            {/* Hủy */}
             <Button variant="outline" className="flex-1" onClick={() => { setEditing(false); setForm({ phone: employee.phone || "", address: employee.address || "" }) }}>Hủy</Button>
+            {/* Gửi yêu cầu */}
             <Button className="flex-1" onClick={handleSubmitRequest} disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Gửi yêu cầu
             </Button>
@@ -168,13 +193,19 @@ export function MyProfileInfo() {
         )}
       </div>
 
+      {/* LỊCH SỬ CÁC YÊU CẦU THAY ĐỔI VÀ TRẠNG THÁI DUYỆT CỦA HR */}
       {myRequests.length > 0 && (
         <div className="mt-6 border-t border-border pt-4">
+          {/* Tiêu đề Lịch sử yêu cầu */}
           <h4 className="text-sm font-semibold mb-3">Lịch sử yêu cầu</h4>
+          {/* Danh sách các yêu cầu */}
           <div className="flex flex-col gap-2">
+            {/* Lặp qua danh sách các yêu cầu */}
             {myRequests.map(r => {
+              {/* Lấy thông tin cấu hình trạng thái */}
               const config = statusConfig[r.status]
               const Icon = config.icon
+              {/* Hiển thị thông tin yêu cầu */}
               return (
                 <div key={r.id} className={`flex items-center justify-between rounded-md p-3 text-sm ${config.color}`}>
                   <div>
@@ -183,6 +214,7 @@ export function MyProfileInfo() {
                       <p className="text-xs mt-1">Lý do từ chối: {r.reject_reason}</p>
                     )}
                   </div>
+                  {/* Icon và nhãn trạng thái */}
                   <div className="flex items-center gap-1 shrink-0">
                     <Icon className="h-4 w-4" />
                     {config.label}

@@ -17,6 +17,7 @@ export type User = {
   avatar_url: string | null
 }
 
+//// Kịch bản định dạng đối tượng User
 type AuthContextType = {
   user: User | null
   isLoading: boolean
@@ -49,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
+  //Khi vừa vào Web, đọc thông tin user đã lưu trong localStorage ra để duy trì trạng thái đăng nhập
   useEffect(() => {
     try {
       const stored = localStorage.getItem("hrm_user")
@@ -62,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // HÀM ĐĂNG NHẬP (login)
   const login = async (email: string, password: string) => {
     try {
       const device_id = getDeviceId()
@@ -72,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       const data = await res.json()
       if (!res.ok) return { success: false, error: data.message || "Đăng nhập thất bại" }
+      // Đăng nhập thành công -> Lưu accessToken, refreshToken, hrm_user vào localStorage & Cookie
       localStorage.setItem("hrm_access_token", data.accessToken)
       localStorage.setItem("hrm_refresh_token", data.refreshToken)
       localStorage.setItem("hrm_user", JSON.stringify(data.user))
@@ -83,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // HÀM ĐĂNG XUẤT (logout)
   const logout = async () => {
     try {
       const refreshToken = localStorage.getItem("hrm_refresh_token")
@@ -93,6 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
     } catch { }
     finally {
+      // Xóa sạch toàn bộ dữ liệu trong bộ nhớ và chuyển hướng về trang /login
       setUser(null)
       localStorage.removeItem("hrm_user")
       localStorage.removeItem("hrm_access_token")
@@ -102,11 +108,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // HÀM KIỂM TRA QUYỀN TRUY CẬP TRANG (hasPermission)
   const hasPermission = (page: string) => {
     if (!user) return false
     const allowed = PAGE_PERMISSIONS[page]
-    if (!allowed) return user.role === "admin"
-    return allowed.includes(user.role)
+    if (!allowed) return user.role === "admin" // Nếu không có trong danh sách, chỉ Admin mới được vào
+    return allowed.includes(user.role) // Check xem role có nằm trong danh sách được phép không
   }
 
   return (
@@ -116,8 +123,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 }
 
+//Giúp các component giao diện gọi ngắn gọn: const { user, logout } = useAuth()
 export function useAuth() {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error("useAuth must be used inside AuthProvider")
   return ctx
 }
+
+/*
+Nếu KHÔNG dùng useAuth() (Phải viết rườm rà 3 dòng):
+Ở mỗi file giao diện (Header, Sidebar, Bảng nhân viên...), bạn phải tự import useContext và AuthContext:
+
+import { useContext } from "react"
+import { AuthContext } from "@/context/AuthContext"
+const context = useContext(AuthContext)
+if (!context) throw new Error("Chưa bọc AuthProvider")
+const user = context.user
+
+Khi CÓ useAuth() (Chỉ cần viết đúng 1 dòng gọn nhẹ):
+
+import { useAuth } from "@/context/AuthContext"
+const { user, logout } = useAuth()
+*/

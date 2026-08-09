@@ -28,6 +28,7 @@ type LeaveRequest = {
   approved_at: string | null
 }
 
+
 const statusStyles: Record<string, string> = {
   "Cho duyet": "bg-amber-50 text-amber-700 ring-amber-600/20",
   "Da duyet": "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
@@ -54,6 +55,7 @@ const typeLabel: Record<string, string> = {
   "Nghi khong luong": "Nghỉ không lương",
 }
 
+
 function getInitials(name: string) {
   return name?.split(" ").map(w => w[0]).slice(-2).join("").toUpperCase() || "?"
 }
@@ -61,22 +63,32 @@ function getInitials(name: string) {
 // Tính số ngày nghỉ thật — loại bỏ Chủ nhật, Thứ 7 vẫn tính là ngày làm việc
 function countWorkingDays(startStr: string, endStr: string) {
   if (!startStr || !endStr) return 0
+  // Tạo đối tượng Date từ chuỗi ngày bắt đầu và kết thúc
   const start = new Date(startStr)
   const end = new Date(endStr)
+  // Kiểm tra nếu ngày kết thúc nhỏ hơn ngày bắt đầu thì trả về 0
   if (end < start) return 0
+  // Khởi tạo biến đếm số ngày làm việc
   let count = 0
+  // Tạo một đối tượng Date mới để duyệt qua các ngày
   const current = new Date(start)
+  // Duyệt qua từng ngày từ ngày bắt đầu đến ngày kết thúc
   while (current <= end) {
-    if (current.getDay() !== 0) { // 0 = Chủ nhật
+    // Kiểm tra nếu ngày hiện tại không phải là Chủ nhật (0 = Chủ nhật)
+    if (current.getDay() !== 0) {
+      // Nếu là ngày làm việc (không phải Chủ nhật) thì tăng biến đếm lên 1
       count++
     }
+    // Tăng ngày hiện tại lên 1 để tiếp tục duyệt ngày tiếp theo
     current.setDate(current.getDate() + 1)
   }
+  // Trả về tổng số ngày làm việc đã đếm được
   return count
 }
 
 export function LeaveTable() {
   const { user } = useAuth()
+  // Phân quyền: Admin, HR, Manager có quyền duyệt đơn; Người dùng đã gắn nhân viên mới được gửi đơn
   const isHRorAdmin = user?.role === "admin" || user?.role === "hr"
   const isManager = user?.role === "manager"
   const canApprove = user?.role === "admin" || user?.role === "hr" || user?.role === "manager"
@@ -97,10 +109,12 @@ export function LeaveTable() {
     start_date: "", end_date: "", total_days: 1, reason: ""
   })
 
+  // Tải danh sách đơn nghỉ phép từ Server
   useEffect(() => {
     fetchLeaves()
   }, [])
 
+  // Hàm xử lý tải danh sách đơn nghỉ phép
   const fetchLeaves = async () => {
     try {
       setLoading(true)
@@ -113,10 +127,12 @@ export function LeaveTable() {
     }
   }
 
+  // Lọc đơn nghỉ phép theo vai trò của người dùng: Nếu là nhân viên thì chỉ xem đơn của mình, còn lại xem tất cả
   const myLeaves = user?.role === "employee"
     ? leaves.filter(l => l.employee_id === user.employee_id)
     : leaves
 
+  // Hàm xử lý lọc danh sách đơn nghỉ phép theo trạng thái
   const filtered = leaves.filter(l => {
     const matchSearch =
       l.full_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -126,9 +142,11 @@ export function LeaveTable() {
     return matchSearch && matchStatus
   })
 
+  // Phân trang danh sách đơn nghỉ phép
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
   const totalPages = Math.ceil(filtered.length / pageSize)
 
+  // Hàm xử lý duyệt đơn
   const handleApprove = async (id: number) => {
     try {
       await leaveService.approve(id)
@@ -139,6 +157,7 @@ export function LeaveTable() {
     }
   }
 
+  // Hàm xử lý từ chối đơn
   const handleReject = async () => {
     if (!rejectModal) return
     if (!rejectReason.trim()) { alert("Vui lòng nhập lý do từ chối"); return }
@@ -153,6 +172,7 @@ export function LeaveTable() {
     }
   }
 
+  // Hàm xử lý tạo đơn mới
   const handleAdd = async () => {
     if (!user?.employee_id) { alert("Tài khoản chưa được gắn với nhân viên"); return }
     if (!newLeave.start_date || !newLeave.end_date) { alert("Vui lòng nhập ngày bắt đầu và kết thúc"); return }
@@ -173,6 +193,7 @@ export function LeaveTable() {
     }
   }
 
+  // Hàm tính số liệu thống kê: Nếu là nhân viên thì tính số liệu của mình, còn lại tính toàn bộ
   const stats = [
     { label: "Chờ duyệt", value: myLeaves.filter(l => l.status === "Cho duyet").length, color: "text-amber-600" },
     { label: "Đã duyệt", value: myLeaves.filter(l => l.status === "Da duyet").length, color: "text-emerald-600" },
@@ -180,6 +201,7 @@ export function LeaveTable() {
     { label: "Tổng đơn", value: myLeaves.length, color: "text-blue-600" },
   ]
 
+  // Hiển thị giao diện chờ tải 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -190,8 +212,10 @@ export function LeaveTable() {
 
   return (
     <>
+    {/* THẺ THỐNG KÊ (Stat Cards: Chờ duyệt, Đã duyệt, Từ chối, Tổng đơn) */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {stats.map(stat => (
+          
           <Card key={stat.label} className="p-4">
             <p className="text-sm text-muted-foreground">{stat.label}</p>
             <p className={cn("text-2xl font-semibold mt-1", stat.color)}>{stat.value}</p>
@@ -199,13 +223,18 @@ export function LeaveTable() {
         ))}
       </div>
 
+      {/* BẢNG DANH SÁCH ĐƠN (TABLE) */}
       <Card className="overflow-hidden p-0">
+        {/* THANH TÌM KIẾM, BỘ LỌC TRẠNG THÁI & NÚT GỬI ĐƠN */}
         <div className="flex flex-col gap-4 border-b border-border p-5 md:flex-row md:items-center md:justify-between">
+          {/* Tiêu đề */}
           <div>
             <h2 className="text-base font-semibold">Danh sách đơn nghỉ phép</h2>
             <p className="text-sm text-muted-foreground">Quản lý đơn xin nghỉ phép của nhân viên</p>
           </div>
+          {/* Tìm kiếm, lọc trạng thái, nút gửi đơn */}
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            {/* Thanh tìm kiếm */}
             <div className="relative w-full sm:w-auto">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input type="search" placeholder="Tìm kiếm..." value={search}
@@ -213,6 +242,7 @@ export function LeaveTable() {
                 className="h-9 w-full min-w-0 rounded-md border border-input bg-background pl-9 pr-3 text-sm outline-none focus:ring-2 ring-ring/40 md:w-56"
               />
             </div>
+            {/* Bộ lọc trạng thái */}
             <select className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none"
               value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setPage(1) }}>
               <option value="">Tất cả trạng thái</option>
@@ -220,6 +250,7 @@ export function LeaveTable() {
               <option value="Da duyet">Đã duyệt</option>
               <option value="Tu choi">Từ chối</option>
             </select>
+            {/* Nút gửi đơn */}
             {canSubmit && (
               <Button size="sm" className="gap-2" onClick={() => setShowAdd(true)}>
                 <Plus className="h-4 w-4" />Gửi đơn
@@ -228,9 +259,12 @@ export function LeaveTable() {
           </div>
         </div>
 
+        {/* BẢNG DANH SÁCH ĐƠN NGHỈ PHÉP */}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-sm">
+            {/* Tiêu đề bảng */}
             <thead className="bg-muted/50">
+            {/* Hàng tiêu đề: Nhân viên, Loại đơn, Ngày bắt đầu, Ngày kết thúc, Số ngày, Trạng thái, Hành động */}
               <tr className="text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 <th className="px-5 py-3">Nhân viên</th>
                 <th className="px-5 py-3">Loại đơn</th>
@@ -241,7 +275,9 @@ export function LeaveTable() {
                 <th className="px-5 py-3 text-right">Hành động</th>
               </tr>
             </thead>
+            {/* Bảng dữ liệu: Lặp qua từng đơn nghỉ phép và hiển thị thông tin */}
             <tbody className="divide-y divide-border">
+            {/* Lặp qua danh sách đơn nghỉ phép đã lọc và phân trang */}
               {paginated.map((leave) => (
                 <tr key={leave.id} className="transition-colors hover:bg-muted/40">
                   <td className="px-5 py-4">
@@ -249,35 +285,46 @@ export function LeaveTable() {
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
                         {getInitials(leave.full_name)}
                       </div>
+                      {/* Tên nhân viên và phòng ban */}
                       <div className="flex flex-col leading-tight">
                         <span className="font-medium">{leave.full_name}</span>
                         <span className="text-xs text-muted-foreground">{leave.department_name}</span>
                       </div>
                     </div>
                   </td>
+                  {/* Cột loại đơn */}
                   <td className="px-5 py-4">
                     <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", typeStyles[leave.request_type] || "bg-gray-50 text-gray-700")}>
                       {typeLabel[leave.request_type] || leave.request_type}
                     </span>
                   </td>
+                  {/* Cột ngày bắt đầu */}
                   <td className="px-5 py-4 text-muted-foreground">{formatDate(leave.start_date)}</td>
+                  {/* Cột ngày kết thúc */}
                   <td className="px-5 py-4 text-muted-foreground">{formatDate(leave.end_date)}</td>
+                  {/* Cột số ngày */}
                   <td className="px-5 py-4 font-medium">{leave.total_days} ngày</td>
+                  {/* Cột trạng thái */}
                   <td className="px-5 py-4">
                     <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset", statusStyles[leave.status] || "bg-gray-50 text-gray-600")}>
                       {statusLabel[leave.status] || leave.status}
                     </span>
                   </td>
+                  {/* Cột hành động */}
                   <td className="px-5 py-4">
+                    {/* Nút xem chi tiết đơn nghỉ phép */}
                     <div className="flex items-center justify-end gap-1">
                       <button type="button" onClick={() => setViewLeave(leave)} className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground">
                         <Eye className="h-4 w-4" />
                       </button>
+                      {/* Nút duyệt hoặc từ chối đơn nghỉ phép */}
                       {canApprove && leave.status === "Cho duyet" && leave.employee_id !== user?.employee_id && (
                         <>
+                        {/* Nút duyệt đơn nghỉ phép */}
                           <button type="button" onClick={() => handleApprove(leave.id)} className="rounded-md px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-50">
                             Duyệt
                           </button>
+                          {/* Nút từ chối đơn nghỉ phép */}
                           <button type="button" onClick={() => { setRejectModal({ id: leave.id }); setRejectReason("") }} className="rounded-md px-2 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50">
                             Từ chối
                           </button>
@@ -291,15 +338,21 @@ export function LeaveTable() {
           </table>
         </div>
 
+        {/* PHÂN TRANG (Pagination) */}
         <div className="flex items-center justify-between border-t border-border px-5 py-4 text-sm text-muted-foreground">
+          {/* Hiển thị số lượng đơn */}
           <p>Hiển thị <span className="font-medium text-foreground">{filtered.length}</span> trong tổng số <span className="font-medium text-foreground">{myLeaves.length}</span> đơn</p>
+          {/* Hiển thị phân trang */}
           {totalPages > 1 && (
             <div className="flex items-center gap-2">
+              {/* Nút trước */}
               <button type="button" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
                 className="rounded-md px-3 py-1 text-sm border border-border hover:bg-muted disabled:opacity-40">
                 Trước
               </button>
+              {/* Số trang hiện tại */}
               <span>{page} / {totalPages}</span>
+              {/* Nút sau */}
               <button type="button" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
                 className="rounded-md px-3 py-1 text-sm border border-border hover:bg-muted disabled:opacity-40">
                 Sau
@@ -309,16 +362,22 @@ export function LeaveTable() {
         </div>
       </Card>
 
-      {/* Modal Xem */}
+      {/* MODAL XEM CHI TIẾT ĐƠN NGHỈ PHÉP */}
       {viewLeave && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50">
           <div className="flex min-h-full items-center justify-center p-4">
+            {/* Form chi tiết đơn nghỉ phép */}
             <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-lg">
+              {/* Tiêu đề modal */}
               <div className="flex items-center justify-between mb-4">
+                {/* Tên nhân viên */}
                 <h3 className="text-lg font-semibold">Chi tiết đơn nghỉ phép</h3>
+                {/* Nút đóng modal */}
                 <button onClick={() => setViewLeave(null)}><X className="h-5 w-5" /></button>
               </div>
+              {/* Nội dung chi tiết đơn nghỉ phép */}
               <div className="flex flex-col gap-3">
+                {/* Thông tin chi tiết đơn nghỉ phép */}
                 {[
                   { label: "Nhân viên", value: viewLeave.full_name },
                   { label: "Phòng ban", value: viewLeave.department_name },
@@ -336,13 +395,17 @@ export function LeaveTable() {
                   </div>
                 ))}
               </div>
+              {/* Nút duyệt hoặc từ chối */}
               <div className="flex gap-2 mt-4">
                 {canApprove && viewLeave.status === "Cho duyet" && viewLeave.employee_id !== user?.employee_id && (
                   <>
+                    {/* Nút duyệt đơn nghỉ phép */}
                     <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" onClick={() => handleApprove(viewLeave.id)}>Duyệt</Button>
+                    {/* Nút từ chối đơn nghỉ phép */}
                     <Button variant="destructive" className="flex-1" onClick={() => { setRejectModal({ id: viewLeave.id }); setRejectReason("") }}>Từ chối</Button>
                   </>
                 )}
+                {/* Nút đóng modal */}
                 <Button variant="outline" className="flex-1" onClick={() => setViewLeave(null)}>Đóng</Button>
               </div>
             </div>
@@ -351,10 +414,13 @@ export function LeaveTable() {
       )}
 
       {/* Modal Từ chối */}
-      {rejectModal && (
+      {rejectModal && ( 
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50">
+          {/* Form từ chối */}
           <div className="flex min-h-full items-center justify-center p-4">
+            {/* Form từ chối đơn nghỉ phép */}
             <div className="w-full max-w-sm rounded-lg bg-background p-6 shadow-lg">
+              {/* Tiêu đề modal */}
               <h3 className="text-lg font-semibold mb-3">Lý do từ chối</h3>
               <textarea
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 ring-ring/40 min-h-[80px]"
@@ -373,14 +439,21 @@ export function LeaveTable() {
 
       {/* Modal Gửi đơn */}
       {showAdd && (
+        
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50">
+          {/* Form gửi đơn */}
           <div className="flex min-h-full items-center justify-center p-4">
+            {/* Form gửi đơn nghỉ phép */}
             <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-lg">
+              {/* Tiêu đề modal */}
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Gửi đơn nghỉ phép</h3>
+                {/* Nút đóng modal */}
                 <button onClick={() => setShowAdd(false)}><X className="h-5 w-5" /></button>
               </div>
+              {/* Nội dung chi tiết đơn nghỉ phép */}
               <div className="flex flex-col gap-3">
+
                 <div>
                   <label className="text-sm text-muted-foreground">Loại đơn</label>
                   <select className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
@@ -392,6 +465,7 @@ export function LeaveTable() {
                     <option value="Nghi khong luong">Nghỉ không lương</option>
                   </select>
                 </div>
+                {/* Ngày bắt đầu nghỉ phép */}
                 <div>
                   <label className="text-sm text-muted-foreground">Từ ngày *</label>
                   <input type="date" className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 ring-ring/40"
@@ -403,6 +477,7 @@ export function LeaveTable() {
                       setNewLeave({ ...newLeave, start_date: start, total_days: days })
                     }} />
                 </div>
+                {/* Ngày kết thúc nghỉ phép */}
                 <div>
                   <label className="text-sm text-muted-foreground">Đến ngày *</label>
                   <input type="date" className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 ring-ring/40"
@@ -414,12 +489,14 @@ export function LeaveTable() {
                       setNewLeave({ ...newLeave, end_date: end, total_days: days })
                     }} />
                 </div>
+                {/* Số ngày nghỉ phép */}
                 <div>
                   <label className="text-sm text-muted-foreground">Số ngày nghỉ (đã trừ Chủ nhật)</label>
                   <p className="mt-1 h-9 flex items-center px-3 text-sm font-medium bg-muted/50 rounded-md border border-input">
                     {newLeave.total_days} ngày
                   </p>
                 </div>
+                {/* Lý do nghỉ phép */}
                 <div>
                   <label className="text-sm text-muted-foreground">Lý do</label>
                   <input className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 ring-ring/40"
@@ -427,6 +504,7 @@ export function LeaveTable() {
                     onChange={e => setNewLeave({ ...newLeave, reason: e.target.value })} />
                 </div>
               </div>
+              {/* Nút Hủy đơn và Gửi đơn */}
               <div className="flex gap-2 mt-4">
                 <Button variant="outline" className="flex-1" onClick={() => setShowAdd(false)}>Hủy</Button>
                 <Button className="flex-1" onClick={handleAdd}>Gửi đơn</Button>

@@ -1,9 +1,10 @@
-import bcrypt from "bcrypt"
-import jwt from "jsonwebtoken"
-import dotenv from "dotenv"
+import bcrypt from "bcrypt" // Mã hóa mật khẩu
+import jwt from "jsonwebtoken" // Tạo token
+import dotenv from "dotenv" // Load biến môi trường
 import pool from "../config/db.js"
 dotenv.config()
 
+// Tạo token ngắn hạn
 function generateAccessToken(user) {
   return jwt.sign(
     { id: user.id, email: user.email, role: user.role, employee_id: user.employee_id },
@@ -12,6 +13,7 @@ function generateAccessToken(user) {
   )
 }
 
+// Tạo token dài hạn
 function generateRefreshToken(user) {
   return jwt.sign(
     { id: user.id },
@@ -20,9 +22,10 @@ function generateRefreshToken(user) {
   )
 }
 
+// Đăng nhập
 export async function login(req, res) {
   try {
-    const { email, password, device_id } = req.body
+    const { email, password, device_id } = req.body //  Lấy email, password và device_id từ dữ liệu Frontend gửi lên
     if (!email || !password) {
       return res.status(400).json({ message: "Vui lòng nhập email và mật khẩu" })
     }
@@ -50,7 +53,9 @@ export async function login(req, res) {
 
     // Device Lock: KHÔNG áp dụng cho Admin, và chỉ áp dụng khi setting đang bật
     if (user.role !== "admin" && deviceLockEnabled) {
+      //kich ban A
       if (user.device_id) {
+        // yêu cầu gửi
         if (!device_id) {
           return res.status(403).json({ message: "Thiếu thông tin thiết bị! Vui lòng đăng nhập từ ứng dụng hợp lệ." })
         }
@@ -58,12 +63,12 @@ export async function login(req, res) {
           return res.status(403).json({ message: "Thiết bị không hợp lệ! Vui lòng dùng thiết bị đã đăng ký hoặc liên hệ Admin để reset." })
         }
       }
-
+      //kich ban B
+      // Nếu chưa có device_id, lưu device_id của thiết bị hiện tại
       if (!user.device_id && device_id) {
         await pool.execute("UPDATE users SET device_id = ? WHERE id = ?", [device_id, user.id])
       }
     }
-
     await pool.execute("UPDATE users SET last_login_at = NOW() WHERE id = ?", [user.id])
 
     const accessToken = generateAccessToken(user)
@@ -107,8 +112,11 @@ export async function logout(req, res) {
   }
 }
 
+
+
 export async function refreshToken(req, res) {
   try {
+    //Bắt lấy giá trị refreshToken do Frontend gửi lên
     const { refreshToken } = req.body
     if (!refreshToken) {
       return res.status(401).json({ message: "Không có refresh token" })
@@ -121,23 +129,29 @@ export async function refreshToken(req, res) {
       return res.status(401).json({ message: "Refresh token không hợp lệ" })
     }
 
+    //Giải mã refresh token
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET)
+
     const [users] = await pool.execute("SELECT * FROM users WHERE id = ?", [decoded.id])
     if (users.length === 0) {
       return res.status(401).json({ message: "Người dùng không tồn tại" })
     }
+    //Kiểm tra xem tài khoản có đang bị Admin KHÓA / VÔ HIỆU HÓA
     if (users[0].is_active !== 1) {
       await pool.execute("DELETE FROM refresh_tokens WHERE token = ?", [refreshToken])
       return res.status(401).json({ message: "Tài khoản đã bị vô hiệu hóa" })
     }
 
+    // Tạo Token MỚI dựa trên thông tin User hợp lệ
     const accessToken = generateAccessToken(users[0])
     return res.json({ accessToken })
+
   } catch (err) {
     return res.status(401).json({ message: "Refresh token không hợp lệ hoặc đã hết hạn" })
   }
 }
 
+//lấy thông tin cá nhân
 export async function getMe(req, res) {
   try {
     const [rows] = await pool.execute(`
@@ -163,8 +177,9 @@ export async function changePassword(req, res) {
     if (!old_password || !new_password) {
       return res.status(400).json({ message: "Vui lòng nhập đầy đủ thông tin" })
     }
-    if (new_password.length < 6) {
-      return res.status(400).json({ message: "Mật khẩu mới phải có ít nhất 6 ký tự" })
+    const strongPasswordRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,}$/
+    if (!strongPasswordRegex.test(new_password)) {
+      return res.status(400).json({ message: "Mật khẩu mới phải có ít nhất 8 ký tự, gồm chữ, số và ký tự đặc biệt" })
     }
     const [rows] = await pool.execute("SELECT password FROM users WHERE id = ?", [req.user.id])
     if (rows.length === 0) return res.status(404).json({ message: "Không tìm thấy tài khoản" })

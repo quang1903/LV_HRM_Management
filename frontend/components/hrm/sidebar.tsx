@@ -37,31 +37,37 @@ const roleLabel: Record<string, string> = {
   employee: "Nhân viên",
 }
 
+// Component Sidebar
 export function Sidebar() {
   const pathname = usePathname()
   const { user, logout, hasPermission } = useAuth()
   const [open, setOpen] = useState(false)
 
+  // Giao diện mở Sidebar 
   useEffect(() => {
     const handleOpen = () => setOpen(true)
     window.addEventListener("open-sidebar", handleOpen)
     return () => window.removeEventListener("open-sidebar", handleOpen)
   }, [])
 
+  // Lấy danh sách Menu dựa trên quyền hạn
   const visibleMenu = mainMenu.filter(item => hasPermission(item.href))
+  // Lấy danh sách Menu chính
   const mainItems = visibleMenu.filter(i => i.group === "main")
+  // Lấy danh sách Menu quản trị
   const adminItems = visibleMenu.filter(i => i.group === "admin")
 
   const content = (
     <div className="flex flex-col h-full min-h-0">
-      {/* Logo */}
       <div className="flex h-[54px] items-center justify-between px-4 shrink-0"
         style={{ borderBottom: "1px solid var(--sidebar-border)" }}>
         <div className="flex items-center gap-2.5">
+          {/* Logo */}
           <div className="flex h-8 w-8 items-center justify-center rounded-lg"
             style={{ background: "rgba(99,102,241,0.9)" }}>
             <Briefcase className="h-4 w-4 text-white" />
           </div>
+          {/* Tên ứng dụng */}
           <div className="flex flex-col leading-tight">
             <span className="text-[13px] font-semibold" style={{ color: "var(--sidebar-accent-foreground)" }}>
               HRM Pro
@@ -71,6 +77,7 @@ export function Sidebar() {
             </span>
           </div>
         </div>
+        {/* Nút đóng sidebar */}
         <button onClick={() => setOpen(false)} className="lg:hidden p-1 rounded"
           style={{ color: "var(--sidebar-foreground)" }}>
           <X className="h-4 w-4" />
@@ -85,6 +92,7 @@ export function Sidebar() {
               style={{ color: "oklch(0.35 0.04 255)" }}>
               Tổng quan
             </p>
+            {/* Hiển thị danh sách Menu chính */}
             {mainItems.map(item => {
               const Icon = item.icon
               const isActive = pathname === item.href
@@ -111,12 +119,14 @@ export function Sidebar() {
           </>
         )}
 
+        {/* Menu quản trị */}
         {adminItems.length > 0 && (
           <>
             <p className="px-2 pb-1 pt-4 text-[9.5px] font-semibold uppercase tracking-widest"
               style={{ color: "oklch(0.35 0.04 255)" }}>
               Quản trị
             </p>
+            {/* Hiển thị danh sách Menu quản trị */}
             {adminItems.map(item => {
               const Icon = item.icon
               const isActive = pathname === item.href
@@ -143,6 +153,7 @@ export function Sidebar() {
           style={{ color: "oklch(0.35 0.04 255)" }}>
           Hệ thống
         </p>
+        {/* Nút đăng xuất */}
         <button type="button" onClick={logout}
           className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-[12.5px] font-medium transition-all duration-100"
           style={{ color: "var(--sidebar-foreground)" }}
@@ -162,11 +173,14 @@ export function Sidebar() {
             style={{ background: "rgba(99,102,241,0.9)" }}>
             {getInitials(user?.full_name || user?.username || "?")}
           </div>
+          {/* Tên và Chức vụ user */}
           <div className="flex min-w-0 flex-col leading-tight">
+            {/* Tên user */}
             <span className="truncate text-[12px] font-medium"
               style={{ color: "var(--sidebar-accent-foreground)" }}>
               {user?.full_name || user?.username || "Chưa đăng nhập"}
             </span>
+            {/* Chức vụ user */}
             <span className="truncate text-[10.5px]" style={{ color: "var(--sidebar-foreground)" }}>
               {roleLabel[user?.role || ""] || user?.role || "Nhân viên"}
             </span>
@@ -179,13 +193,16 @@ export function Sidebar() {
   return (
     <>
       <aside className="hidden lg:block w-56 h-screen sticky top-0 shrink-0 overflow-hidden" style={{ background: "var(--sidebar)" }}>
+        {/* Nơi chứa nội dung sidebar */}
         <div className="flex flex-col h-screen overflow-hidden">
           {content}
         </div>
       </aside>
+      {/* Giao diện khi mở Sidebar */}
       {open && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="fixed inset-0 bg-black/50" onClick={() => setOpen(false)} />
+          {/* Nội dung sidebar */}
           <aside className="relative w-64 max-w-[85vw] h-full overflow-hidden" style={{ background: "var(--sidebar)" }}>
             <div className="flex flex-col h-full overflow-hidden">
               {content}

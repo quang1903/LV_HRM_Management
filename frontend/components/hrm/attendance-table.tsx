@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Search, Plus, X, CheckCircle, XCircle, Clock, Pencil, Loader2 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { cn, formatDate } from "@/lib/utils"
 import { useAuth } from "@/context/AuthContext"
 import { attendanceService } from "@/services/attendance"
 import { employeeService } from "@/services/employee"
@@ -41,20 +41,34 @@ function getInitials(name: string) {
 }
 
 export function AttendanceTable() {
+
   const { user } = useAuth()
+
   const canEdit = user?.role === "admin" || user?.role === "hr"
 
+  //State lưu trữ danh sách chấm công
   const [attendances, setAttendances] = useState<Attendance[]>([])
+  //State lưu trữ danh sách nhân viên (dùng cho admin/hr để thêm/sửa chấm công)
   const [employees, setEmployees]     = useState<any[]>([])
+  //State trạng thái tải dữ liệu
   const [loading, setLoading]         = useState(true)
+  //State lưu giá trị tìm kiếm
   const [search, setSearch]           = useState("")
+  //State tháng hiển thị trên bảng
   const [month, setMonth]             = useState(new Date().getMonth() + 1)
+  //State năm hiển thị trên bảng
   const [year, setYear]               = useState(new Date().getFullYear())
+  //State kiểm tra hiển thị form thêm
   const [showAdd, setShowAdd]         = useState(false)
+  //State bộ lọc trạng thái
   const [filterStatus, setFilterStatus] = useState("")
+  //State trang hiện tại
   const [page, setPage] = useState(1)
+  //Số item hiển thị mỗi trang
   const PAGE_SIZE = 20
+  //State lưu trữ chấm công đang chỉnh sửa
   const [editAttendance, setEditAttendance] = useState<Attendance | null>(null)
+  //State lưu trữ chấm công mới đang nhập
   const [newAttendance, setNewAttendance]   = useState({
     employee_id: "", work_date: "", check_in: "", check_out: "", status: "Dung gio"
   })
@@ -224,7 +238,7 @@ export function AttendanceTable() {
                     </div>
                   </td>
                   <td className="px-5 py-4 text-muted-foreground">{att.department_name}</td>
-                  <td className="px-5 py-4 text-muted-foreground">{att.work_date?.substring(0, 10)}</td>
+                  <td className="px-5 py-4 text-muted-foreground">{formatDate(att.work_date)}</td>
                   <td className="px-5 py-4 font-medium">{att.check_in ? att.check_in.substring(11, 16) : "—"}</td>
                   <td className="px-5 py-4 font-medium">{att.check_out ? att.check_out.substring(11, 16) : "—"}</td>
                   <td className="px-5 py-4 text-muted-foreground">
@@ -281,7 +295,7 @@ export function AttendanceTable() {
                 <h3 className="text-lg font-semibold">Điều chỉnh chấm công</h3>
                 <button onClick={() => setEditAttendance(null)}><X className="h-5 w-5" /></button>
               </div>
-              <p className="font-medium mb-3">{editAttendance.full_name} — {editAttendance.work_date?.substring(0, 10)}</p>
+              <p className="font-medium mb-3">{editAttendance.full_name} — {formatDate(editAttendance.work_date)}</p>
               <div className="flex flex-col gap-3">
                 <div>
                   <label className="text-sm text-muted-foreground">Giờ check-in</label>

@@ -2,6 +2,7 @@ import pool from "../config/db.js"
 import dotenv from "dotenv"
 dotenv.config()
 
+//Lấy Danh sách Tất cả Phòng ban
 export async function getDepartments(req, res) {
   try {
     const [rows] = await pool.execute(`
@@ -16,6 +17,7 @@ export async function getDepartments(req, res) {
   }
 }
 
+//Xem Chi tiết 1 Phòng ban
 export async function getDepartmentById(req, res) {
   try {
     const [rows] = await pool.execute(`
@@ -31,6 +33,7 @@ export async function getDepartmentById(req, res) {
   }
 }
 
+
 export async function createDepartment(req, res) {
   try {
     const { name, description, manager_id } = req.body
@@ -40,6 +43,7 @@ export async function createDepartment(req, res) {
       [name, description || null, manager_id || null]
     )
 
+    //Xử lý nâng quyền tự động: Nếu phòng ban mới tạo có gán Trưởng phòng
     if (manager_id) {
       const [managerUser] = await pool.execute(
         "SELECT role FROM users WHERE employee_id = ?", [manager_id]
@@ -58,9 +62,11 @@ export async function createDepartment(req, res) {
 export async function updateDepartment(req, res) {
   const conn = await pool.getConnection()
   try {
+    //để đảm bảo nếu quá trình cập nhật bị lỗi giữa chừng, toàn bộ các bước sẽ được Rollback
     await conn.beginTransaction()
 
     const { name, description, manager_id } = req.body
+    //kt database
     const [existing] = await conn.execute("SELECT id, manager_id FROM departments WHERE id = ?", [req.params.id])
     if (existing.length === 0) {
       await conn.rollback()
@@ -74,6 +80,7 @@ export async function updateDepartment(req, res) {
 
     // Nếu có gán Trưởng phòng mới và khác với người cũ
     if (newManagerId && newManagerId !== oldManagerId) {
+      //tim user id
       const [newManagerUser] = await conn.execute(
         "SELECT id, role FROM users WHERE employee_id = ?",
         [newManagerId]
@@ -88,6 +95,7 @@ export async function updateDepartment(req, res) {
         "SELECT id FROM positions WHERE department_id = ? AND name LIKE 'Trưởng phòng%' LIMIT 1",
         [req.params.id]
       )
+      //Nếu tìm thấy chức vụ Trưởng phòng -> Cập nhật position_id này cho Nhân viên mới
       if (leaderPos.length > 0) {
         await conn.execute(
           "UPDATE employees SET position_id = ? WHERE id = ?",
@@ -95,29 +103,33 @@ export async function updateDepartment(req, res) {
         )
       }
     }
-
+//----------------------------
     // Nếu đổi qua người khác, kiểm tra hạ role người cũ
     if (oldManagerId && oldManagerId !== newManagerId) {
+      //Kiểm tra xem Trưởng phòng cũ này có đang làm Trưởng phòng ở phòng ban NÀO KHÁC nữa không
       const [otherDepts] = await conn.execute(
         "SELECT id FROM departments WHERE manager_id = ? AND id != ?",
         [oldManagerId, req.params.id]
       )
+      //Nếu người cũ KHÔNG còn làm Trưởng phòng ở bất kỳ phòng ban nào khác nữa 
       if (otherDepts.length === 0) {
         const [oldManagerUser] = await conn.execute(
           "SELECT id, role FROM users WHERE employee_id = ?",
           [oldManagerId]
         )
+        //Nếu tài khoản đang là 'manager' -> Hạ quyền về lại 'employee'
         if (oldManagerUser.length > 0 && oldManagerUser[0].role === "manager") {
           await conn.execute("UPDATE users SET role = 'employee' WHERE employee_id = ?", [oldManagerId])
           warningMessage += " Đã tự động hạ quyền tài khoản Trưởng phòng cũ về Nhân viên (không còn quản lý phòng nào)."
         }
       }
 
-      // Tự động bỏ chức vụ Trưởng phòng của người cũ — tìm chức vụ thường của phòng đó
+      // Tự động bỏ chức vụ Trưởng phòng của người cũ — tìm chức vụ thường
       const [normalPos] = await conn.execute(
         "SELECT id FROM positions WHERE department_id = ? AND name NOT LIKE 'Trưởng phòng%' LIMIT 1",
         [req.params.id]
       )
+      //Chuyển chức vụ của Trưởng phòng cũ về lại chức vụ nhân viên thường 
       if (normalPos.length > 0) {
         await conn.execute(
           "UPDATE employees SET position_id = ? WHERE id = ?",
@@ -126,6 +138,7 @@ export async function updateDepartment(req, res) {
       }
     }
 
+    //Cập nhật thông tin 
     await conn.execute(
       "UPDATE departments SET name=?, description=?, manager_id=? WHERE id=?",
       [name, description || null, newManagerId, req.params.id]

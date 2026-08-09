@@ -28,6 +28,7 @@ export async function getAttendances(req, res) {
       params.push(req.user.employee_id)
     }
 
+    //Lọc dữ liệu chấm công theo Tháng và Năm (ví dụ: tháng 8/2026 -> lấy từ ngày 2026-08-01 đến 2026-08-31)
     if (month && year) {
       const m = String(month).padStart(2, "0")
       const startDate = `${year}-${m}-01`
@@ -36,10 +37,13 @@ export async function getAttendances(req, res) {
       query += " AND a.work_date BETWEEN ? AND ?"
       params.push(startDate, endDate)
     }
+
+    //Lọc dữ liệu chấm công theo Phòng ban
     if (department_id) {
       query += " AND e.department_id = ?"
       params.push(department_id)
     }
+    // Sắp xếp dữ liệu chấm công theo ngày làm việc (gần nhất trước) và giờ vào làm (sớm nhất trước)
     query += " ORDER BY a.work_date DESC, a.check_in DESC"
     const [rows] = await pool.execute(query, params)
     return res.json(rows)
@@ -88,6 +92,7 @@ export async function createAttendance(req, res) {
     if (work_date > today) {
       return res.status(400).json({ message: "Không thể thêm chấm công cho ngày tương lai" })
     }
+    //Kiểm tra nhân viên đã có bản ghi chấm công cho ngày này chưa (chống tạo trùng)
     const [existing] = await pool.execute(
       "SELECT id FROM attendances WHERE employee_id = ? AND work_date = ?",
       [employee_id, work_date]
@@ -104,6 +109,7 @@ export async function createAttendance(req, res) {
     const checkInFormatted = formatTime(check_in, work_date)
     const checkOutFormatted = formatTime(check_out, work_date)
 
+    //Tính toán số phút làm việc thực tế 
     let work_minutes = 0
     if (check_in && check_out) {
       // Hỗ trợ cả format "HH:MM" và "YYYY-MM-DD HH:MM:SS"
@@ -117,6 +123,7 @@ export async function createAttendance(req, res) {
       if (isNaN(work_minutes) || work_minutes < 0) work_minutes = 0
     }
 
+    //Insert dữ liệu chấm công vào database
     const [result] = await pool.execute(`
       INSERT INTO attendances (employee_id, shift_id, work_date, check_in, check_out, work_minutes, status, note)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -134,6 +141,7 @@ export async function updateAttendance(req, res) {
     const [existing] = await pool.execute("SELECT id, work_date FROM attendances WHERE id = ?", [req.params.id])
     if (existing.length === 0) return res.status(404).json({ message: "Không tìm thấy bản ghi chấm công" })
 
+    //Chuẩn hóa chuỗi ngày giờ DATETIME
     const rawDate = existing[0]?.work_date
     const work_date = rawDate ? (typeof rawDate === 'string' ? rawDate.split('T')[0] : new Date(rawDate).toISOString().split('T')[0]) : null
 
@@ -143,13 +151,16 @@ export async function updateAttendance(req, res) {
       return `${date} ${time}:00`
     }
 
+    //Định dạng giờ vào làm và giờ ra làm (nếu được gửi lên dưới dạng chuỗi giờ đơn giản, ví dụ: "08:30" hoặc "09:00")
     const checkInFormatted = formatTime(check_in, work_date)
     const checkOutFormatted = formatTime(check_out, work_date)
 
+    //Kiểm tra giờ ra (check-out) phải lớn hơn giờ vào (check-in)
     if (check_in && check_out && checkOutFormatted <= checkInFormatted) {
       return res.status(400).json({ message: "Giờ ra (check-out) phải lớn hơn giờ vào (check-in)" })
     }
 
+    //Tính toán số phút làm việc thực tế
     let work_minutes = 0
     if (check_in && check_out) {
       const parseTime = (t) => {
@@ -162,6 +173,7 @@ export async function updateAttendance(req, res) {
       if (isNaN(work_minutes) || work_minutes < 0) work_minutes = 0
     }
 
+    //Cập nhật dữ liệu chấm công vào database
     await pool.execute(`
       UPDATE attendances SET check_in=?, check_out=?, work_minutes=?, status=?, note=? WHERE id=?
     `, [checkInFormatted, checkOutFormatted, work_minutes, status || 'Vang mat', note || null, req.params.id])
@@ -173,23 +185,28 @@ export async function updateAttendance(req, res) {
 
 export async function checkIn(req, res) {
   try {
+    //Lấy giá trị mã QR và tọa độ GPS từ thiết bị quét gửi lên
     const { qr_value, latitude, longitude } = req.body
     if (!qr_value) return res.status(400).json({ message: "Mã QR không hợp lệ" })
     if (!latitude || !longitude) return res.status(400).json({ message: "Thiếu vị trí GPS của thiết bị quét" })
 
+    //Lấy tọa độ GPS nhà máy/văn phòng công ty trong bảng settings
     const [settingsRows] = await pool.execute("SELECT * FROM settings WHERE id = 1")
     if (settingsRows.length === 0) return res.status(400).json({ message: "Chưa cài đặt vị trí công ty" })
     const companyLat = parseFloat(settingsRows[0].company_lat)
     const companyLng = parseFloat(settingsRows[0].company_lng)
-    const maxDist = parseFloat(settingsRows[0].max_distance || 500)
+    const maxDist = parseFloat(settingsRows[0].max_distance || 500)//// Khoảng cách tối đa cho phép (mặc định 500m)
+    //tính kc
     const distance = getDistanceMeters(latitude, longitude, companyLat, companyLng)
     if (distance > maxDist) {
       return res.status(403).json({ message: `Thiết bị quét không ở trong khu vực công ty (${Math.round(distance)}m)` })
     }
 
+    //Phân tích mã QR (Tách employee_code và OTP)
     const [employee_code, otp] = qr_value.split(":")
     if (!employee_code || !otp) return res.status(400).json({ message: "Mã QR sai định dạng" })
 
+    // Dùng mã SECRET của công ty + Mã NV để xác minh xem mã OTP 6 số có hợp lệ trong chu kỳ 30s không
     const secret = process.env.QR_SECRET_KEY + employee_code
     const isValid = verifyTotp(otp, secret)
     if (!isValid) return res.status(400).json({ message: "Mã QR đã hết hạn, vui lòng quét lại" })
@@ -211,11 +228,14 @@ export async function checkIn(req, res) {
       return res.status(400).json({ message: "Hôm nay bạn đã được duyệt nghỉ phép, không thể check-in" })
     }
 
+    //CHỐNG CHECK-IN LẦN 2 TRONG NGÀY
     const [existing] = await pool.execute(
       "SELECT id, check_in FROM attendances WHERE employee_id = ? AND work_date = ?",
       [employee.id, today]
     )
     if (existing.length > 0 && existing[0].check_in) return res.status(400).json({ message: "Nhân viên đã check-in hôm nay" })
+
+    //kiểm tra như nào đúng hay sap
     const hour = nowVN.getHours(), minute = nowVN.getMinutes()
     const status = (hour > 8 || (hour === 8 && minute > 30)) ? "Di tre" : "Dung gio"
     if (existing.length === 0) {
@@ -235,6 +255,7 @@ export async function checkIn(req, res) {
 
 export async function checkOut(req, res) {
   try {
+    
     const { qr_value, latitude, longitude } = req.body
     if (!qr_value) return res.status(400).json({ message: "Mã QR không hợp lệ" })
     if (!latitude || !longitude) return res.status(400).json({ message: "Thiếu vị trí GPS của thiết bị quét" })
@@ -263,6 +284,7 @@ export async function checkOut(req, res) {
     if (employees.length === 0) return res.status(404).json({ message: "Không tìm thấy nhân viên" })
     const employee = employees[0]
 
+    //Tìm bản ghi Check-in gần nhất trong 24h qua mà chưa Check-out
     const [existing] = await pool.execute(
       "SELECT id, check_in, status FROM attendances WHERE employee_id = ? AND check_in IS NOT NULL AND check_out IS NULL AND check_in >= DATE_SUB(NOW(), INTERVAL 24 HOUR) ORDER BY check_in DESC LIMIT 1",
       [employee.id]
@@ -274,7 +296,7 @@ export async function checkOut(req, res) {
     if (diffMinutes < 0.05) {
       return res.status(400).json({ message: "Bạn vừa check-in, vui lòng chờ ít nhất 3 giây trước khi check-out" })
     }
-    const work_minutes = Math.round(diffMinutes)
+    const work_minutes = Math.round(diffMinutes) // Tính tổng số phút làm việc thực tế
 
     const { nowVN } = getVietnamTime()
     const hour = nowVN.getHours()
@@ -299,13 +321,14 @@ function getVietnamTime() {
   return { now, nowVN, today }
 }
 
+// Tính khoảng cách giữa 2 điểm GPS theo đường chim bay
 function getDistanceMeters(lat1, lng1, lat2, lng2) {
-  const R = 6371000
+  const R = 6371000 // Bán kính Trái đất theo mét (6,371km)
   const dLat = (lat2 - lat1) * Math.PI / 180
   const dLng = (lng2 - lng1) * Math.PI / 180
   const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
             Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
             Math.sin(dLng/2) * Math.sin(dLng/2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) // Trả về khoảng cách tính bằng MÉT giữa 2 vị trí GPS
   return R * c
 }

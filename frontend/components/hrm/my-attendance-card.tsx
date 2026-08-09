@@ -11,6 +11,7 @@ export function MyAttendanceCard() {
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
+  // HÀM GIẢ LẬP CHECK-IN TẠI CHỖ
   const handleCheckIn = () => {
     setLoading(true)
     setTimeout(() => {
@@ -22,6 +23,7 @@ export function MyAttendanceCard() {
     }, 400)
   }
 
+  // HÀM GIẢ LẬP CHECK-OUT TẠI CHỖ
   const handleCheckOut = () => {
     setLoading(true)
     setTimeout(() => {
@@ -33,6 +35,7 @@ export function MyAttendanceCard() {
     }, 400)
   }
 
+  // HÀM TỰ ĐỘNG CHUYỂN HUY HIỆU TRẠNG THÁI (Chưa điểm danh -> Đã Check-in -> Đã hoàn thành)
   const getStatusBadge = () => {
     if (!checkInTime) {
       return (
@@ -59,12 +62,16 @@ export function MyAttendanceCard() {
   }
 
   return (
+    // 4. GIAO DIỆN THẺ NÚT CHẤM CÔNG
     <Card className="p-6 border-slate-200 shadow-sm relative overflow-hidden bg-white">
+      {/* Tiêu đề giao diện */} 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 mb-4">
         <div className="flex items-center gap-3">
+          {/* Icon đồng hồ */}
           <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 shadow-sm">
             <Clock className="w-5 h-5" />
           </div>
+          {/* Tiêu đề và mô tả */}
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-semibold text-slate-900 text-base">Nút Chấm công / Điểm danh cá nhân</h3>
@@ -78,6 +85,7 @@ export function MyAttendanceCard() {
         </div>
       </div>
 
+      {/* Hiển thị thông báo */}
       {msg && (
         <div className="p-3 rounded-lg text-xs mb-4 bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-2 animate-fadeIn">
           <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -85,6 +93,7 @@ export function MyAttendanceCard() {
         </div>
       )}
 
+      {/* Hiển thị thông tin giờ check-in check-out và nút bấm */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
         <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
           <div className="text-[11px] text-slate-500 font-medium mb-1">Giờ Check-in vào</div>
@@ -93,6 +102,7 @@ export function MyAttendanceCard() {
           </div>
         </div>
 
+        {/* Hiển thị thông tin giờ check-out ra */}
         <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
           <div className="text-[11px] text-slate-500 font-medium mb-1">Giờ Check-out ra</div>
           <div className="text-lg font-bold text-slate-800">
@@ -100,7 +110,9 @@ export function MyAttendanceCard() {
           </div>
         </div>
 
+        {/* Hiển thị các nút chức năng điểm danh */}
         <div className="flex flex-col justify-center gap-2">
+          {/* Nút Check-in */}
           {!checkInTime ? (
             <Button
               onClick={handleCheckIn}

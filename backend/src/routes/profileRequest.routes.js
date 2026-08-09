@@ -4,10 +4,10 @@ import { authMiddleware, roleMiddleware } from "../middlewares/auth.middleware.j
 
 const router = Router()
 
-router.post("/",              authMiddleware, createRequest)
-router.get("/my",             authMiddleware, getMyRequests)
-router.get("/",                authMiddleware, roleMiddleware("admin", "hr"), getAllRequests)
-router.patch("/:id/approve",  authMiddleware, roleMiddleware("admin", "hr"), approveRequest)
+router.post("/",              authMiddleware, createRequest) //tạo yêu cầu
+router.get("/my",             authMiddleware, getMyRequests) //xem yêu cầu của tôi
+router.get("/",                authMiddleware, roleMiddleware("admin", "hr"), getAllRequests) //xem tất cả yêu cầu trong hệ thống
+router.patch("/:id/approve",  authMiddleware, roleMiddleware("admin", "hr"), approveRequest) 
 router.patch("/:id/reject",   authMiddleware, roleMiddleware("admin", "hr"), rejectRequest)
 
 export default router

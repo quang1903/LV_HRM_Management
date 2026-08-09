@@ -10,6 +10,7 @@ export async function getContracts(req, res) {
       LEFT JOIN employees e ON c.employee_id = e.id
     `
     const params = []
+    //Chỉ xem danh sách hợp đồng của nhân viên thuộc phòng mình quản lý
     if (req.user.role === 'manager') {
       query += ' WHERE e.department_id IN (SELECT id FROM departments WHERE manager_id = ?)'
       params.push(req.user.employee_id)
@@ -33,6 +34,7 @@ export async function getContractById(req, res) {
     `, [req.params.id])
     if (rows.length === 0) return res.status(404).json({ message: "Không tìm thấy hợp đồng" })
 
+    //Nếu Hợp đồng này thuộc về nhân viên phòng khác -> Dừng lại trả lỗi 403 (Cấm xem)
     if (req.user.role === 'manager') {
       const [dept] = await pool.execute(
         "SELECT id FROM departments WHERE id = ? AND manager_id = ?",
@@ -58,14 +60,20 @@ export async function createContract(req, res) {
     if (end_date && new Date(end_date) <= new Date(start_date)) {
       return res.status(400).json({ message: "Ngày kết thúc phải sau ngày bắt đầu" })
     }
+
+    //Nếu nhân viên đã nghỉ việc -> Không cho tạo hợp đồng mới!
     const [emp] = await pool.execute("SELECT id, status FROM employees WHERE id = ?", [employee_id])
     if (emp.length === 0) return res.status(404).json({ message: "Không tìm thấy nhân viên" })
     if (emp[0].status === 'Nghi viec') return res.status(400).json({ message: "Không thể tạo hợp đồng cho nhân viên đã nghỉ việc" })
+
+    //Kiểm tra nhân viên đó đã có hợp đồng đang làm việc chưa
     const [existing] = await pool.execute(
       "SELECT id FROM contracts WHERE employee_id = ? AND status = 'Dang hieu luc'",
       [employee_id]
     )
     if (existing.length > 0) return res.status(400).json({ message: "Nhân viên đã có hợp đồng đang hiệu lực" })
+    
+    //Lưu Hợp đồng mới vào MySQL với trạng thái ban đầu 'Dang hieu luc'
     const [result] = await pool.execute(`
       INSERT INTO contracts (employee_id, contract_type, start_date, end_date, salary, status)
       VALUES (?, ?, ?, ?, ?, 'Dang hieu luc')
@@ -81,10 +89,11 @@ export async function renewContract(req, res) {
   try {
     const { end_date } = req.body
     if (!end_date) return res.status(400).json({ message: "Vui lòng nhập ngày gia hạn mới" })
+
     const [existing] = await pool.execute("SELECT id, start_date, employee_id FROM contracts WHERE id = ?", [req.params.id])
     if (existing.length === 0) return res.status(404).json({ message: "Không tìm thấy hợp đồng" })
 
-    // Kiểm tra nhân viên còn làm việc không
+    // Nếu nhân viên đã nghỉ việc -> Không cho phép gia hạn hợp đồng nữa!
     const [empRows] = await pool.execute(
       "SELECT status FROM employees WHERE id = ?",
       [existing[0].employee_id]
@@ -92,11 +101,11 @@ export async function renewContract(req, res) {
     if (empRows.length > 0 && empRows[0].status === 'Nghi viec') {
       return res.status(400).json({ message: "Không thể gia hạn hợp đồng cho nhân viên đã nghỉ việc" })
     }
-
+    // Kiểm tra nếu Hợp đồng này đã bị chấm dứt rồi thì không cho gia hạn
     if (existing[0].status === 'Da cham dut') {
       return res.status(400).json({ message: "Hợp đồng đã chấm dứt không thể gia hạn, vui lòng tạo hợp đồng mới" })
     }
-    // Kiểm tra nhân viên đã có HĐ hiệu lực khác chưa
+    // Nếu nhân viên này đã có một Hợp đồng khác đang có hiệu lực -> Không cho gia hạn HĐ cũ
     const [activeContracts] = await pool.execute(
       "SELECT id FROM contracts WHERE employee_id = ? AND status = 'Dang hieu luc' AND id != ?",
       [existing[0].employee_id, req.params.id]
@@ -104,10 +113,13 @@ export async function renewContract(req, res) {
     if (activeContracts.length > 0) {
       return res.status(400).json({ message: "Nhân viên đã có hợp đồng đang hiệu lực, không thể gia hạn hợp đồng cũ" })
     }
-
+    // Ngày gia hạn phải lớn hơn Ngày bắt đầu hợp đồng ban đầu
     if (new Date(end_date) <= new Date(existing[0].start_date)) {
       return res.status(400).json({ message: "Ngày kết thúc phải sau ngày bắt đầu hợp đồng" })
     }
+
+    //Cập nhật ngày kết thúc mới (end_date) và đặt lại trạng thái 'Dang hieu luc'
+
     await pool.execute(
       "UPDATE contracts SET end_date=?, status='Dang hieu luc' WHERE id=?",
       [end_date, req.params.id]
@@ -123,6 +135,8 @@ export async function terminateContract(req, res) {
     const [existing] = await pool.execute("SELECT id, status FROM contracts WHERE id = ?", [req.params.id])
     if (existing.length === 0) return res.status(404).json({ message: "Không tìm thấy hợp đồng" })
     if (existing[0].status !== 'Dang hieu luc') return res.status(400).json({ message: "Hợp đồng không còn hiệu lực" })
+
+    //Đổi trạng thái hợp đồng thành 'Da cham dut'
     await pool.execute("UPDATE contracts SET status='Da cham dut' WHERE id=?", [req.params.id])
     return res.json({ message: "Chấm dứt hợp đồng thành công" })
   } catch (err) {
@@ -130,6 +144,7 @@ export async function terminateContract(req, res) {
   }
 }
 
+//Cảnh Báo Hợp Đồng Sắp Hết Hạn Trong 30 Ngày
 export async function getExpiringContracts(req, res) {
   try {
     let query = `

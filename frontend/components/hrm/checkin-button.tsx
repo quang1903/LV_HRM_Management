@@ -7,9 +7,12 @@ import { Button } from "@/components/ui/button"
 import { attendanceService } from "@/services/attendance"
 
 export function CheckinButton() {
+  //Biến trạng thái hiển thị 
   const [loading, setLoading] = useState<"in" | "out" | null>(null)
+  //Lưu trữ thông báo thành công/thất bại
   const [result, setResult] = useState<{ type: string; message: string; success: boolean } | null>(null)
 
+  // 1. LẤY TỌA ĐỘ GPS TỪ TRÌNH DUYỆT (với độ chính xác cao enableHighAccuracy: true)
   const getLocation = (): Promise<{ lat: number; lng: number }> => {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
@@ -24,6 +27,7 @@ export function CheckinButton() {
     })
   }
 
+  // XỬ LÝ CHẤM CÔNG VÀO (Check-in)
   const handleCheckIn = async () => {
     try {
       setLoading("in")
@@ -38,6 +42,7 @@ export function CheckinButton() {
     }
   }
 
+  // XỬ LÝ CHẤM CÔNG RA (Check-out)
   const handleCheckOut = async () => {
     try {
       setLoading("out")
@@ -54,6 +59,7 @@ export function CheckinButton() {
     }
   }
 
+  {/* Hiển thị thông báo thành công / thất bại (ví dụ: Báo Đi trễ hoặc Không ở phạm vi công ty) */}
   return (
     <Card className="p-5">
       <div className="flex items-center gap-2 mb-4">

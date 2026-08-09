@@ -99,6 +99,7 @@ export async function createLeave(req, res) {
       return res.status(400).json({ message: "Khoảng ngày nghỉ không hợp lệ (toàn bộ là Chủ nhật)" })
     }
 
+    //Lưu đơn xin nghỉ vào DB với trạng thái ban đầu 'Cho duyet'
     const [result] = await pool.execute(`
       INSERT INTO leave_requests (employee_id, request_type, start_date, end_date, total_days, reason, status)
       VALUES (?, ?, ?, ?, ?, ?, 'Cho duyet')
@@ -110,7 +111,7 @@ export async function createLeave(req, res) {
   }
 }
 
-// Đếm số ngày nghỉ phép thật, loại bỏ Chủ nhật (getUTCDay() === 0)
+// Đếm số ngày nghỉ phép thật, loại bỏ Chủ nhật)
 function countWorkingDays(startStr, endStr) {
   const toStr = (val) => typeof val === "string" ? val.split("T")[0] : new Date(val).toISOString().split("T")[0]
   const [sy, sm, sd] = toStr(startStr).split("-").map(Number)
@@ -137,9 +138,11 @@ export async function approveLeave(req, res) {
       [req.params.id]
     )
     if (existing.length === 0) return res.status(404).json({ message: "Không tìm thấy đơn" })
+    
     if (existing[0].status !== 'Cho duyet') return res.status(400).json({ message: "Đơn đã được xử lý" })
 
     // Chặn Trưởng phòng tự duyệt đơn của chính mình
+    //ng xin nghỉ và người duyệt đơn
     if (existing[0].employee_id === req.user.employee_id) {
       return res.status(403).json({ message: "Bạn không thể tự duyệt đơn nghỉ phép của chính mình" })
     }
@@ -172,6 +175,7 @@ export async function approveLeave(req, res) {
       const [ey, em, ed] = toStr(end_date).split("-").map(Number)
       const current = new Date(Date.UTC(sy, sm - 1, sd))
       const end = new Date(Date.UTC(ey, em - 1, ed))
+      // Chạy vòng lặp từng ngày trong khoảng xin nghỉ phép
       while (current <= end) {
         if (current.getUTCDay() !== 0) { // Bỏ qua Chủ nhật
           const workDate = current.toISOString().split("T")[0]
@@ -181,13 +185,13 @@ export async function approveLeave(req, res) {
             [employee_id, workDate]
           )
           if (existing.length === 0) {
-            // Chưa có → tạo mới Vắng mặt
+            // // Chưa có -> Tạo mới 1 bản ghi Chấm công với trạng thái 'Vang mat' (Để không bị tính là quên chấm công)
             await pool.execute(
               "INSERT INTO attendances (employee_id, work_date, status) VALUES (?, ?, 'Vang mat')",
               [employee_id, workDate]
             )
           } else {
-            // Đã có → cập nhật thành Vắng mặt
+            // Đã có -> Đổi trạng thái thành 'Vang mat' và reset giờ check_in, check_out về NULL
             await pool.execute(
               "UPDATE attendances SET status = 'Vang mat', check_in = NULL, check_out = NULL WHERE employee_id = ? AND work_date = ?",
               [employee_id, workDate]

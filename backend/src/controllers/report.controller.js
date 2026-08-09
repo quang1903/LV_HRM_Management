@@ -2,6 +2,7 @@ import pool from "../config/db.js"
 import dotenv from "dotenv"
 dotenv.config()
 
+//Báo Cáo Thống Kê Quy Mô Nhân Sự Các Phòng Ban
 export async function getAttendanceReport(req, res) {
   try {
     const { month, year } = req.query
@@ -11,9 +12,10 @@ export async function getAttendanceReport(req, res) {
 
     const mm = String(m).padStart(2, "0")
     const startDate = `${y}-${mm}-01`
-    const lastDay = new Date(y, m, 0).getDate()
+    const lastDay = new Date(y, m, 0).getDate()//// Lấy số ngày tối đa trong tháng (28, 29, 30 hoặc 31)
     const endDate = `${y}-${mm}-${String(lastDay).padStart(2, "0")}`
     const params = [startDate, endDate]
+
     if (req.user.role === 'manager') {
       params.push(req.user.employee_id)
     }
@@ -43,6 +45,7 @@ export async function getAttendanceReport(req, res) {
   }
 }
 
+//Báo Cáo Thống Kê Quy Mô Nhân Sự Các Phòng Ban
 export async function getDepartmentReport(req, res) {
   try {
     const deptParams = []
@@ -52,6 +55,7 @@ export async function getDepartmentReport(req, res) {
       deptParams.push(req.user.employee_id)
     }
 
+    // Truy vấn thống kê từng phòng ban (Tên phòng, Tên Trưởng phòng, Tổng nhân sự, Số người Đang làm, Số người Nghỉ việc)
     const [rows] = await pool.execute(`
       SELECT
         d.id, d.name as department_name,
@@ -72,6 +76,7 @@ export async function getDepartmentReport(req, res) {
   }
 }
 
+//Báo Cáo Thống Kê Tình Hình Nghỉ Phép Tháng
 export async function getLeaveReport(req, res) {
   try {
     const { month, year } = req.query
@@ -111,10 +116,12 @@ export async function getLeaveReport(req, res) {
   }
 }
 
+//Báo Cáo Thống Kê Tổng Quan Hợp Đồng Lao Động
 export async function getContractReport(req, res) {
   try {
     const expiringParams = req.user.role === 'manager' ? [req.user.employee_id] : []
 
+    //Thống kê tổng số lượng hợp đồng theo từng trạng thái ('Dang hieu luc', 'Da cham dut')
     const [summary] = await pool.execute(`
       SELECT c.status, COUNT(*) as total
       FROM contracts c
@@ -123,6 +130,7 @@ export async function getContractReport(req, res) {
       GROUP BY c.status
     `, expiringParams)
 
+    //Danh sách hợp đồng sẽ hết hạn trong 30 ngày tới
     const [expiring] = await pool.execute(`
       SELECT c.*, e.full_name, e.employee_code
       FROM contracts c

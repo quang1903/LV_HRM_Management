@@ -3,6 +3,7 @@ import bcrypt from "bcrypt"
 import dotenv from "dotenv"
 dotenv.config()
 
+//Lấy danh sách Tài khoản Hệ thống
 export async function getUsers(req, res) {
   try {
     let query = `
@@ -50,17 +51,21 @@ export async function getUsers(req, res) {
   }
 }
 
+//Tạo Tài khoản Đăng nhập Mới
 export async function createUser(req, res) {
   try {
     const { username, email, password, role, employee_id } = req.body
     if (!username || !email || !password || !role) {
       return res.status(400).json({ message: "Vui lòng nhập đầy đủ thông tin" })
     }
+
+    //Kiểm tra Email hoặc Username đã tồn tại chưa
     const [existing] = await pool.execute(
       "SELECT id FROM users WHERE email = ? OR username = ?", [email, username]
     )
     if (existing.length > 0) return res.status(400).json({ message: "Email hoặc username đã tồn tại" })
 
+    //Kiểm tra Nhân viên hợp lệ hay không
     if (employee_id) {
       const [empRows] = await pool.execute("SELECT id, status FROM employees WHERE id = ?", [employee_id])
       if (empRows.length === 0) return res.status(400).json({ message: "Không tìm thấy nhân viên" })
@@ -68,10 +73,12 @@ export async function createUser(req, res) {
         return res.status(400).json({ message: "Nhân viên đã nghỉ việc, không thể tạo tài khoản" })
       }
 
+      //Kiểm tra Nhân viên đã có tài khoản chưa
       const [dupEmp] = await pool.execute("SELECT id FROM users WHERE employee_id = ?", [employee_id])
       if (dupEmp.length > 0) return res.status(400).json({ message: "Nhân viên này đã có tài khoản" })
     }
 
+    //Mã hóa mật khẩu bằng Bcrypt và chèn vào bảng `users` với trạng thái mở (`is_active = 1`)
     const hashed = await bcrypt.hash(password, 10)
     const [result] = await pool.execute(`
       INSERT INTO users (username, email, password, role, employee_id, is_active)
@@ -86,10 +93,11 @@ export async function createUser(req, res) {
 
 export async function updateUser(req, res) {
   try {
+    //Kiểm tra tài khoản cần sửa có tồn tại trong hệ thống hay không
     const { role, employee_id } = req.body
     const [existing] = await pool.execute("SELECT id, role, employee_id FROM users WHERE id = ?", [req.params.id])
     if (existing.length === 0) return res.status(404).json({ message: "Không tìm thấy tài khoản" })
-
+    //Kiểm tra nếu có nhân viên được gán vào tài khoản thì phải kiểm tra tiếp
     if (employee_id) {
       const [dupEmp] = await pool.execute("SELECT id FROM users WHERE employee_id = ? AND id != ?", [employee_id, req.params.id])
       if (dupEmp.length > 0) return res.status(400).json({ message: "Nhân viên này đã có tài khoản khác" })
@@ -105,12 +113,14 @@ export async function updateUser(req, res) {
         [oldUser.employee_id]
       )
       if (deptRows.length > 0) {
+        //Gán manager_id = NULL ở bảng departments
         await pool.execute("UPDATE departments SET manager_id = NULL WHERE manager_id = ?", [oldUser.employee_id])
         const deptNames = deptRows.map(d => d.name).join(", ")
         warningMessage = ` (Đã tự động bỏ chức Trưởng phòng tại: ${deptNames})`
       }
     }
 
+    //Cập nhật thông tin role và employee_id mới vào bảng users
     await pool.execute(
       "UPDATE users SET role = ?, employee_id = ? WHERE id = ?",
       [role, employee_id || null, req.params.id]
@@ -128,9 +138,12 @@ export async function toggleUser(req, res) {
       "SELECT id, is_active FROM users WHERE id = ?", [req.params.id]
     )
     if (existing.length === 0) return res.status(404).json({ message: "Không tìm thấy tài khoản" })
+    
+    //Không cho phép Admin tự khóa tài khoản của chính mình (req.user.id)
     if (existing[0].id === req.user.id) {
       return res.status(400).json({ message: "Không thể vô hiệu hóa tài khoản của chính mình" })
     }
+    //Đảo ngược trạng thái: Nếu đang 1 (active) -> 0 (inactive), và ngược lại
     const newStatus = existing[0].is_active ? 0 : 1
     await pool.execute("UPDATE users SET is_active = ? WHERE id = ?", [newStatus, req.params.id])
     return res.json({ message: newStatus ? "Kích hoạt thành công" : "Vô hiệu hóa thành công" })
@@ -146,6 +159,7 @@ export async function resetPassword(req, res) {
     if (!password) return res.status(400).json({ message: "Vui lòng nhập mật khẩu mới" })
     const hashed = await bcrypt.hash(password, 10)
     const [result] = await pool.execute("UPDATE users SET password = ? WHERE id = ?", [hashed, req.params.id])
+    //Nếu không có dòng nào được cập nhật => User ID không tồn tại
     if (result.affectedRows === 0) return res.status(404).json({ message: "Không tìm thấy tài khoản" })
     return res.json({ message: "Đặt lại mật khẩu thành công" })
   } catch (err) {
@@ -166,12 +180,13 @@ export async function resetDevice(req, res) {
 
 export async function resetDeviceByEmployee(req, res) {
   try {
-    const employeeId = req.params.id // ID của NHÂN VIÊN (employees.id), không phải user.id
+    const employeeId = req.params.id // ID của NHÂN VIÊN (employees.id)
 
+    //Tìm user id tương ứng với employee_id này
     const [userRows] = await pool.execute("SELECT id FROM users WHERE employee_id = ?", [employeeId])
     if (userRows.length === 0) return res.status(404).json({ message: "Nhân viên chưa có tài khoản" })
 
-    // Nếu là Manager, kiểm tra nhân viên có thuộc phòng ban mình quản lý không
+    //Nếu là Manager, kiểm tra nhân viên có thuộc phòng ban mình quản lý không
     if (req.user.role === "manager") {
       const [emp] = await pool.execute("SELECT department_id FROM employees WHERE id = ?", [employeeId])
       if (emp.length === 0) return res.status(404).json({ message: "Không tìm thấy nhân viên" })
@@ -185,6 +200,7 @@ export async function resetDeviceByEmployee(req, res) {
       }
     }
 
+    //Thực hiện đặt device_id = NULL
     await pool.execute("UPDATE users SET device_id = NULL WHERE id = ?", [userRows[0].id])
     return res.json({ message: "Đã reset thiết bị, nhân viên có thể đăng nhập lại từ máy mới" })
   } catch (err) {
@@ -208,6 +224,7 @@ export async function resetDeviceByDepartment(req, res) {
       }
     }
 
+    //Lấy tất cả các user có employee_id thuộc departmentId
     const [userRows] = await pool.execute(`
       SELECT u.id FROM users u
       INNER JOIN employees e ON u.employee_id = e.id
@@ -218,6 +235,7 @@ export async function resetDeviceByDepartment(req, res) {
       return res.json({ message: "Không có tài khoản nào trong phòng ban này", resetCount: 0 })
     }
 
+    //Thực hiện đặt device_id = NULL
     const userIds = userRows.map(r => r.id)
     await pool.execute(
       `UPDATE users SET device_id = NULL WHERE id IN (${userIds.map(() => "?").join(",")})`,

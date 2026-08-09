@@ -8,11 +8,14 @@ let settingsCache = null
 let settingsCacheTime = 0
 const CACHE_TTL = 60 * 1000
 
+//xóa cache khi admin bấm
 export function clearSettingsCache() {
   settingsCache = null
   settingsCacheTime = 0
 }
 
+
+//lấy trạng thái khóa thiết bị
 async function getDeviceLockEnabled() {
   const now = Date.now()
   if (settingsCache !== null && now - settingsCacheTime < CACHE_TTL) {
@@ -24,9 +27,11 @@ async function getDeviceLockEnabled() {
   return settingsCache
 }
 
+
+//kiem tra token có hợp lệ không và device có khớp không
 export async function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  if (!authHeader || !authHeader.startsWith("Bearer ")) { // người nắm giữ
     return res.status(401).json({ message: "Không có token" })
   }
   const token = authHeader.split(" ")[1]
@@ -59,6 +64,8 @@ export async function authMiddleware(req, res, next) {
   }
 }
 
+
+//Kiểm tra quyền role 
 export function roleMiddleware(...roles) {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {

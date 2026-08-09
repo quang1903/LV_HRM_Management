@@ -10,23 +10,28 @@ import { Button } from "@/components/ui/button"
 import { cn, formatDate } from "@/lib/utils"
 import { reportService } from "@/services/report"
 
+
+//BIỂU ĐỒ CỘT Thống kê số lượng nhân viên đi làm theo từng ngày trong tháng
 function AttendanceBarChart({ data }: { data: { date: string; count: number }[] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const chartRef = useRef<Chart | null>(null)
 
   useEffect(() => {
     if (!canvasRef.current || !data.length) return
-    if (chartRef.current) chartRef.current.destroy()
+    if (chartRef.current) chartRef.current.destroy()// Xóa biểu đồ cũ trước khi vẽ lại
     const canvas = canvasRef.current
     const ctx = canvas.getContext("2d")!
+
+    // Tạo gradient màu xanh lam gradient đẹp mắt
     const gradient = ctx.createLinearGradient(0, 0, 0, 300)
     gradient.addColorStop(0, "rgba(59, 130, 246, 0.9)")
     gradient.addColorStop(1, "rgba(59, 130, 246, 0.1)")
 
+    // Tạo biểu đồ cột
     chartRef.current = new Chart(canvas, {
       type: "bar",
       data: {
-        labels: data.map(d => d.date.substring(5)),
+        labels: data.map(d => d.date.substring(5)),// Hiển thị ngày (MM-DD)
         datasets: [{
           label: "Số nhân viên đi làm",
           data: data.map(d => d.count),
@@ -77,6 +82,7 @@ function AttendanceBarChart({ data }: { data: { date: string; count: number }[] 
   return <canvas ref={canvasRef} />
 }
 
+//BIỂU ĐỒ TRÒN Thống kê tỷ lệ đi làm đúng giờ, đi trễ, vắng mặt, về sớm
 function AttendanceDoughnutChart({ stats }: { stats: { dung_gio: number; di_tre: number; vang_mat: number; ve_som: number } }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const chartRef = useRef<Chart | null>(null)
@@ -123,16 +129,19 @@ function AttendanceDoughnutChart({ stats }: { stats: { dung_gio: number; di_tre:
   return <canvas ref={canvasRef} />
 }
 
+//Bảng tổng quan theo phòng ban
 export function ReportsPanel() {
   const [activeTab, setActiveTab] = useState<"attendance" | "department" | "leave" | "contract">("attendance")
   const [month, setMonth] = useState(new Date().getMonth() + 1)
   const [year, setYear] = useState(new Date().getFullYear())
 
+  //Lấy dữ liệu
   const [attendanceData, setAttendanceData] = useState<any[]>([])
   const [departmentData, setDepartmentData] = useState<any[]>([])
   const [leaveData, setLeaveData] = useState<any[]>([])
   const [contractData, setContractData] = useState<{ summary: any[]; expiring: any[] }>({ summary: [], expiring: [] })
 
+  //state loading
   const [loadingAttendance, setLoadingAttendance] = useState(false)
   const [loadingDepartment, setLoadingDepartment] = useState(false)
   const [loadingLeave, setLoadingLeave] = useState(false)
@@ -140,6 +149,7 @@ export function ReportsPanel() {
 
   const [dailyData, setDailyData] = useState<{ date: string; count: number }[]>([])
 
+  //Tính toán số liệu
   const stats = useMemo(() => ({
     dung_gio: attendanceData.reduce((sum, e) => sum + Number(e.on_time || 0), 0),
     di_tre: attendanceData.reduce((sum, e) => sum + Number(e.late || 0), 0),
@@ -147,6 +157,7 @@ export function ReportsPanel() {
     ve_som: attendanceData.reduce((sum, e) => sum + Number(e.early_leave || 0), 0),
   }), [attendanceData])
 
+  //Lấy dữ liệu
   useEffect(() => {
     if (!attendanceData.length) {
       setDailyData([])
@@ -168,6 +179,7 @@ export function ReportsPanel() {
       .catch(() => { })
   }, [attendanceData, month, year])
 
+  //Tính toán số liệu
   const totalEmployees = departmentData.reduce((sum, d) => sum + Number(d.active || 0), 0)
   const totalAttDays = attendanceData.reduce((sum, e) => sum + Number(e.total_days || 0), 0)
   const totalOnTime = attendanceData.reduce((sum, e) => sum + Number(e.on_time || 0), 0)
@@ -175,28 +187,33 @@ export function ReportsPanel() {
   const pendingLeaves = leaveData.reduce((sum, e) => sum + Number(e.pending || 0), 0)
   const expiringContracts = contractData.expiring.length
 
+  // TẢI DỮ LIỆU BÁO CÁO KHI ĐỔI THÁNG/NĂM
   useEffect(() => { fetchDepartment(); fetchContract() }, [])
   useEffect(() => { fetchAttendance(); fetchLeave() }, [month, year])
 
+  //Hàm lấy dữ liệu chấm công
   const fetchAttendance = async () => {
     try { setLoadingAttendance(true); const res = await reportService.getAttendance(month, year); setAttendanceData(res.data) }
     catch { } finally { setLoadingAttendance(false) }
   }
+  //Hàm lấy dữ liệu phòng ban
   const fetchDepartment = async () => {
     try { setLoadingDepartment(true); const res = await reportService.getDepartment(); setDepartmentData(res.data) }
     catch { } finally { setLoadingDepartment(false) }
   }
+  //Hàm lấy dữ liệu nghỉ phép
   const fetchLeave = async () => {
     try { setLoadingLeave(true); const res = await reportService.getLeave(month, year); setLeaveData(res.data) }
     catch { } finally { setLoadingLeave(false) }
   }
+  //Hàm lấy dữ liệu hợp đồng
   const fetchContract = async () => {
     try { setLoadingContract(true); const res = await reportService.getContract(); setContractData(res.data) }
     catch { } finally { setLoadingContract(false) }
   }
-
+  //Hàm đếm số lượng hợp đồng theo trạng thái
   const contractCount = (status: string) => contractData.summary.find(s => s.status === status)?.total || 0
-
+  //Danh sách các tab báo cáo
   const tabs = [
     { key: "attendance", label: "Chấm công", icon: Clock },
     { key: "department", label: "Phòng ban", icon: Users },
@@ -206,7 +223,7 @@ export function ReportsPanel() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Summary cards */}
+      {/* CÁC THẺ THỐNG KÊ TỔNG QUAN (Tổng NV, Tỷ lệ đúng giờ, Đơn chờ duyệt, HĐ sắp hết hạn) */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
           { label: "Tổng nhân viên", value: totalEmployees || "—", color: "text-blue-600", bg: "bg-blue-50" },
@@ -239,8 +256,10 @@ export function ReportsPanel() {
         </select>
       </div>
 
-      {/* Charts */}
+      {/* VẼ 2 BIỂU ĐỒ */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        
+        {/* Biểu đồ cột hiển thị số lượng chấm công theo từng ngày */}
         <div className="lg:col-span-2 rounded-xl border border-border bg-background p-5">
           <h3 className="text-sm font-semibold mb-4">Chấm công theo ngày</h3>
           {dailyData.length > 0
@@ -248,6 +267,8 @@ export function ReportsPanel() {
             : <p className="text-sm text-muted-foreground text-center py-8">Chưa có dữ liệu</p>
           }
         </div>
+
+        {/* Biểu đồ tròn hiển thị tỷ lệ các loại chấm công */} 
         <div className="rounded-xl border border-border bg-background p-5">
           <h3 className="text-sm font-semibold mb-4">Tỷ lệ chấm công</h3>
           {stats && (stats.dung_gio + stats.di_tre + stats.vang_mat + stats.ve_som) > 0
@@ -257,7 +278,7 @@ export function ReportsPanel() {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Các tab hiển thị báo cáo chi tiết theo từng danh mục */}
       <div className="flex gap-2 border-b border-border">
         {tabs.map(tab => {
           const Icon = tab.icon
@@ -279,6 +300,7 @@ export function ReportsPanel() {
         <Card className="p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold">Báo cáo chấm công tháng {month}/{year}</h3>
+            {/* Nút bấm tự động gọi hàm exportToExcel để xuất file .xlsx */}
             <Button variant="outline" size="sm" className="gap-2" onClick={() => exportToExcel(
               attendanceData,
               [
@@ -441,7 +463,7 @@ export function ReportsPanel() {
               </div>
             )}
           </Card>
-
+          {/* Hiển thị thông báo các hợp đồng sắp hết hạn trong 30 ngày */}
           {contractData.expiring.length > 0 && (
             <Card className="p-5">
               <h3 className="font-semibold mb-4 text-amber-600">⚠ Hợp đồng sắp hết hạn trong 30 ngày</h3>

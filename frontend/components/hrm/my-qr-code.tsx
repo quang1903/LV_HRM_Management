@@ -9,16 +9,26 @@ import { employeeService } from "@/services/employee"
 import { useAuth } from "@/context/AuthContext"
 
 export function MyQRCode() {
+  // Lấy thông tin user hiện tại từ AuthContext
   const { user } = useAuth()
+  // Khởi tạo state để lưu trữ ảnh QR Code (dạng DataURL - Base64)
   const [qrImage, setQrImage] = useState<string>("")
+  // Khởi tạo state để đếm ngược thời gian còn lại trước khi mã QR hết hạn (mặc định 30 giây)
   const [secondsLeft, setSecondsLeft] = useState(30)
+  // State để xử lý trạng thái tải (loading)
   const [loading, setLoading] = useState(true)
+  // State để lưu trữ thông báo lỗi
   const [error, setError] = useState<string | null>(null)
+  // State kiểm tra mã đã hết hạn hay chưa
   const [expired, setExpired] = useState(false)
+  // State kiểm tra trạng thái làm mới (refreshing)
   const [refreshing, setRefreshing] = useState(false)
+  // State để đếm số lần gọi API lấy mã QR (để trigger useEffect đếm ngược)
   const [fetchCount, setFetchCount] = useState(0)
+  // Ref để lưu ID của setInterval, giúp quản lý và clear interval
   const intervalRef = useRef<any>(null)
 
+  // 1. HÀM TẠO MÃ QR: Lấy chuỗi mã hóa từ Backend và chuyển thành ảnh DataURL (Base64)
   const fetchQR = async (isManual = false) => {
     if (isManual) {
       if (refreshing) return
@@ -36,7 +46,7 @@ export function MyQRCode() {
         color: { dark: "#000000", light: "#ffffff" }
       })
       setQrImage(dataUrl)
-      setSecondsLeft(30)
+      setSecondsLeft(30) // Reset đồng hồ về 30 giây
       setFetchCount(prev => prev + 1)
       setError(null)
     } catch (err: any) {
@@ -46,6 +56,7 @@ export function MyQRCode() {
     }
   }
 
+  
   useEffect(() => {
     if (!user?.employee_id) {
       setLoading(false)
@@ -55,12 +66,13 @@ export function MyQRCode() {
     fetchQR(false)
   }, [user])
 
+   // ĐỒNG HỒ ĐẾM NGƯỢC 30 GIÂY: Khi hết 30 giây tự động gọi fetchQR() lấy mã mới
   useEffect(() => {
     if (!qrImage || expired) return
     intervalRef.current = setInterval(() => {
       setSecondsLeft(prev => {
         if (prev <= 1) {
-          fetchQR(false)
+          fetchQR(false)// Tự đổi mã khi hết thời gian
           return 0
         }
         return prev - 1
@@ -84,21 +96,25 @@ export function MyQRCode() {
         <h3 className="font-semibold">Mã QR chấm công</h3>
       </div>
 
+      {/* Hiển thị ảnh QR Code & Thanh tiến trình 30s */}
       {loading ? (
         <div className="h-[220px] w-[220px] flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
+        // Hiển thị thông báo lỗi
       ) : error ? (
         <div className="h-[220px] w-[220px] flex items-center justify-center text-center text-sm text-muted-foreground px-4">
           {error}
         </div>
       ) : (
+        // Hiển thị ảnh QR Code
         <div className="relative">
           <img
             src={qrImage}
             alt="QR Code"
             className={`rounded-md border border-border ${expired ? "opacity-20 blur-sm" : ""}`}
           />
+          {/* Hiển thị nút bấm tạo mã mới khi mã đã hết hạn */}
           {expired && (
             <div className="absolute inset-0 flex items-center justify-center">
               <Button size="sm" className="gap-2" onClick={handleRefresh}>
@@ -110,6 +126,7 @@ export function MyQRCode() {
         </div>
       )}
 
+      {/* Thanh tiến trình 30 giây */}
       {!error && !expired && (
         <div className="mt-3 flex items-center gap-2">
           <div className="h-2 w-32 rounded-full bg-muted overflow-hidden">
@@ -118,19 +135,23 @@ export function MyQRCode() {
               style={{ width: `${(secondsLeft / 30) * 100}%` }}
             />
           </div>
+          {/* Đếm ngược thời gian còn lại */}
           <span className="text-xs text-muted-foreground tabular-nums">{secondsLeft}s</span>
         </div>
       )}
 
+      {/* Hiển thị thông báo hết hạn */}
       {!error && expired && (
         <p className="text-xs text-rose-600 mt-3 text-center">Mã đã hết hạn, bấm "Tạo mã mới" để tiếp tục</p>
       )}
 
+      {/* Hướng dẫn sử dụng */}
       {!error && !expired && (
         <p className="text-xs text-muted-foreground text-center mt-3">
           Đưa mã này lên camera máy chấm công tại cổng. Mã tự hết hạn sau 30 giây để bảo mật.
         </p>
       )}
+      {/* Nút bấm tạo mã mới */}
       {!error && !expired && !loading && !refreshing && (
         <button
           onClick={handleRefresh}

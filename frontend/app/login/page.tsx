@@ -25,10 +25,10 @@ export default function LoginPage() {
   }
 
   const demoAccounts = [
-    { label: "Quản trị viên", email: "admin@hrm.com",   color: "#6d28d9", bg: "#f5f3ff", border: "#ede9fe" },
-    { label: "Nhân sự (HR)",  email: "hr@hrm.com",      color: "#1d4ed8", bg: "#eff6ff", border: "#dbeafe" },
-    { label: "Quản lý",       email: "manager@hrm.com", color: "#b45309", bg: "#fffbeb", border: "#fef3c7" },
-    { label: "Nhân viên",     email: "nv001@hrm.com",   color: "#15803d", bg: "#f0fdf4", border: "#dcfce7" },
+    { label: "Quản trị viên", email: "admin@hrm.com",              color: "#6d28d9", bg: "#f5f3ff", border: "#ede9fe" },
+    { label: "Nhân sự (HR)",  email: "hr@hrm.com",                 color: "#1d4ed8", bg: "#eff6ff", border: "#dbeafe" },
+    { label: "Quản lý",       email: "nguyen.van.an@hrm.com",      color: "#b45309", bg: "#fffbeb", border: "#fef3c7" },
+    { label: "Nhân viên",     email: "tran.thi.bich@hrm.com",      color: "#15803d", bg: "#f0fdf4", border: "#dcfce7" },
   ]
 
   return (

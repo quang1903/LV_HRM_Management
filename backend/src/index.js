@@ -1,6 +1,8 @@
+//khai bao thu vien
 import express from "express"
-import cors from "cors"
-import dotenv from "dotenv"
+import cors from "cors" //gui yeu cau lay du lieu cho back end ma ko bị chan
+import dotenv from "dotenv"  //doc bien an va file cau hinh
+
 import authRoutes from "./routes/auth.routes.js"
 import employeeRoutes from "./routes/employee.routes.js"
 import departmentRoutes from "./routes/department.routes.js"
@@ -18,8 +20,8 @@ dotenv.config()
 const app  = express()
 const PORT = process.env.PORT || 5000
 
-app.use(cors({ origin: "*", credentials: true }))
-app.use(express.json())
+app.use(cors({ origin: "*", credentials: true })) // vé thông hành
+app.use(express.json()) // phiên dịch
 
 app.use("/api/auth",        authRoutes)
 app.use("/api/employees",   employeeRoutes)

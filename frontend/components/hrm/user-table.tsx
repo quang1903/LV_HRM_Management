@@ -10,6 +10,7 @@ import { employeeService } from "@/services/employee"
 import { departmentService } from "@/services/department"
 import { useAuth } from "@/context/AuthContext"
 
+
 type User = {
   id: number
   username: string
@@ -61,6 +62,7 @@ export function UserTable() {
     username: "", email: "", password: "", role: "employee", employee_id: ""
   })
 
+  // Tải danh sách Users, Employees, Departments khi mở giao diện
   useEffect(() => {
     fetchUsers()
     employeeService.getAll().then(res => setEmployees(res.data)).catch(() => {})
@@ -71,7 +73,7 @@ export function UserTable() {
     try {
       setLoading(true)
       const res = await userService.getAll()
-      // Deduplicate theo id, ghép managing_department_name nếu có nhiều phòng
+      // Deduplicate theo id, ghép managing_department_name nếu 1 người quản lý nhiều phòng
       const map = new Map()
       for (const u of res.data) {
         if (map.has(u.id)) {
@@ -93,6 +95,7 @@ export function UserTable() {
     }
   }
 
+  //Khóa / Mở khóa tài khoản
   const handleToggle = async (id: number) => {
     try {
       await userService.toggle(id)
@@ -102,6 +105,7 @@ export function UserTable() {
     }
   }
 
+  //Cập nhật quyền (role) và nhân viên liên kết
   const handleEdit = async () => {
     if (!editUser) return
     try {
@@ -116,6 +120,7 @@ export function UserTable() {
     }
   }
 
+  //Tạo tài khoản mới
   const handleAdd = async () => {
     if (!newUser.username || !newUser.email || !newUser.password) {
       alert("Vui lòng nhập đầy đủ thông tin")
@@ -134,6 +139,7 @@ export function UserTable() {
     }
   }
 
+  //Đặt lại mật khẩu
   const handleResetPassword = async () => {
     if (!resetModal || !newPassword.trim()) {
       alert("Vui lòng nhập mật khẩu mới")
@@ -149,10 +155,12 @@ export function UserTable() {
     }
   }
 
+  // HÀM RESET THIẾT BỊ HÀNG LOẠT (Theo Phòng ban hoặc Toàn bộ công ty)
   const [showResetModal, setShowResetModal] = useState(false)
   const [resetDeptId, setResetDeptId] = useState("")
   const [resetting, setResetting] = useState(false)
 
+  //Xóa/Reset thiết bị
   const handleResetDevice = async () => {
     if (resetDeptId) {
       // Reset theo phòng
@@ -170,7 +178,7 @@ export function UserTable() {
         setResetting(false)
       }
     } else {
-      // Reset tất cả
+      // Reset tất cả nhân viên trong hệ thống
       if (!confirm("Reset thiết bị cho TẤT CẢ nhân viên trong hệ thống?")) return
       try {
         setResetting(true)
@@ -193,6 +201,7 @@ export function UserTable() {
     )
   }
 
+  // LỌC DANH SÁCH TÀI KHOẢN: Lọc theo từ khóa (username, email, tên NV) + Phòng ban + Filter chỉ xem Quản lý & HR
   const filteredUsers = users.filter(u => {
     const q = search.toLowerCase()
     const matchSearch =
@@ -209,7 +218,9 @@ export function UserTable() {
 
   return (
     <>
+      {/* Giao diện bảng User */}
       <Card className="overflow-hidden p-0">
+        {/* THANH CÔNG CỤ TÌM KIẾM, LỌC PHÒNG BAN & NÚT THAO TÁC */}
         <div className="flex flex-col gap-4 border-b border-border p-5 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-base font-semibold">Danh sách tài khoản</h2>
@@ -226,6 +237,7 @@ export function UserTable() {
                 className="h-9 w-56 rounded-md border border-input bg-background pl-9 pr-3 text-sm outline-none ring-ring/40 focus:ring-2"
               />
             </div>
+            {/* Bộ lọc chọn Phòng ban */}
             <select
               className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none"
               value={filterDept}
@@ -234,6 +246,7 @@ export function UserTable() {
               <option value="">-- Tất cả phòng ban --</option>
               {departments.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
+            {/* Nút lọc nhanh chỉ xem Quản lý & HR */}
             <Button
               variant={filterManagerOnly ? "default" : "outline"}
               size="sm"
@@ -242,6 +255,7 @@ export function UserTable() {
             >
               Quản lý & HR
             </Button>
+            {/* Các nút Reset thiết bị & Tạo tài khoản mới */}
             {(currentUser?.role === "admin" || currentUser?.role === "hr") && (
               <>
                 <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowResetModal(true)}>
@@ -255,6 +269,7 @@ export function UserTable() {
           </div>
         </div>
 
+        {/* BẢNG HIỂN THỊ DANH SÁCH TÀI KHOẢN */}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[800px] text-sm">
             <thead className="bg-muted/50">
@@ -270,6 +285,7 @@ export function UserTable() {
             <tbody className="divide-y divide-border">
               {filteredUsers.map(u => (
                 <tr key={u.id} className="hover:bg-muted/40">
+                  {/* Cột tài khoản */}
                   <td className="px-5 py-4">
                     <div className="flex flex-col leading-tight">
                       <span className="font-medium">{u.username}</span>
@@ -278,6 +294,7 @@ export function UserTable() {
                       )}
                     </div>
                   </td>
+                  {/* Cột thông tin nhân viên */}
                   <td className="px-5 py-4 text-muted-foreground">
                     {u.full_name ? (
                       <div className="flex flex-col leading-tight">
@@ -286,6 +303,7 @@ export function UserTable() {
                       </div>
                     ) : "Chưa gắn"}
                   </td>
+                  {/* Cột chức danh */}
                   <td className="px-5 py-4">
                     <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", roleStyles[u.role])}>
                       {roleLabel[u.role] || u.role}
@@ -296,6 +314,7 @@ export function UserTable() {
                       </p>
                     )}
                   </td>
+                  {/* Cột trạng thái tài khoản */}
                   <td className="px-5 py-4">
                     <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset",
                       u.is_active ? "bg-emerald-50 text-emerald-700 ring-emerald-600/20" : "bg-slate-100 text-slate-600 ring-slate-500/20"
@@ -303,17 +322,22 @@ export function UserTable() {
                       {u.is_active ? "Hoạt động" : "Vô hiệu"}
                     </span>
                   </td>
+                  {/* Cột ngày đăng nhập gần nhất */}
                   <td className="px-5 py-4 text-muted-foreground text-xs">
                     {u.last_login_at ? new Date(u.last_login_at).toLocaleString("vi-VN") : "Chưa đăng nhập"}
                   </td>
+                  {/* CỘT NÚT THAO TÁC (Đổi role, Đặt lại mật khẩu, Reset thiết bị cá nhân, Khóa/Mở tài khoản) */}
                   <td className="px-5 py-4">
                     <div className="flex items-center justify-end gap-1">
+                      {/* Nút đổi role*/}
                       <button type="button" onClick={() => setEditUser({ ...u })} className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground" title="Đổi role">
                         <Pencil className="h-4 w-4" />
                       </button>
+                      {/* Nút đặt lại mk*/}
                       <button type="button" onClick={() => { setResetModal({ id: u.id, username: u.username }); setNewPassword("") }} className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground" title="Đặt lại mật khẩu">
                         <KeyRound className="h-4 w-4" />
                       </button>
+                      {/* Nút reset thiết bị cá nhân*/}
                       <button type="button" onClick={async () => {
                         if (!u.employee_id) {
                           alert("Tài khoản này chưa gắn với nhân viên, không thể reset theo cách này")
@@ -342,6 +366,7 @@ export function UserTable() {
         </div>
       </Card>
 
+      {/* MODAL CẬP NHẬT ROLE & LIÊN KẾT NHÂN VIÊN */}
       {editUser && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50">
           <div className="flex min-h-full items-center justify-center p-4">
@@ -351,6 +376,7 @@ export function UserTable() {
                 <button onClick={() => setEditUser(null)}><X className="h-5 w-5" /></button>
               </div>
               <div className="flex flex-col gap-3">
+                {/* Chọn Role*/}
                 <div>
                   <label className="text-sm text-muted-foreground">Role</label>
                   <select
@@ -364,6 +390,8 @@ export function UserTable() {
                     <option value="employee">Nhân viên</option>
                   </select>
                 </div>
+
+                {/* Gắn với nhân viên*/}
                 <div>
                   <label className="text-sm text-muted-foreground">Gắn với nhân viên</label>
                   <select
@@ -379,6 +407,8 @@ export function UserTable() {
                       ))}
                   </select>
                 </div>
+
+                {/* Nút lưu thay đổi*/}
               </div>
               <div className="flex gap-2 mt-4">
                 <Button variant="outline" className="flex-1" onClick={() => setEditUser(null)}>Hủy</Button>
@@ -389,6 +419,7 @@ export function UserTable() {
         </div>
       )}
 
+      {/* MODAL ĐẶT LẠI MẬT KHẨU */}
       {resetModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50">
           <div className="flex min-h-full items-center justify-center p-4">
@@ -397,6 +428,8 @@ export function UserTable() {
                 <h3 className="text-lg font-semibold">Đặt lại mật khẩu</h3>
                 <button onClick={() => setResetModal(null)}><X className="h-5 w-5" /></button>
               </div>
+
+              {/* Thông tin tài khoản cần reset*/}
               <p className="text-sm text-muted-foreground mb-3">Tài khoản: <span className="font-medium text-foreground">{resetModal.username}</span></p>
               <div>
                 <label className="text-sm text-muted-foreground">Mật khẩu mới *</label>
@@ -408,6 +441,8 @@ export function UserTable() {
                   placeholder="Nhập mật khẩu mới..."
                 />
               </div>
+
+              {/* Nút xác nhận*/}
               <div className="flex gap-2 mt-4">
                 <Button variant="outline" className="flex-1" onClick={() => setResetModal(null)}>Hủy</Button>
                 <Button className="flex-1" onClick={handleResetPassword}>Xác nhận</Button>
@@ -417,6 +452,7 @@ export function UserTable() {
         </div>
       )}
 
+      {/* MODAL TẠO TÀI KHOẢN MỚI */}
       {showAdd && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50">
           <div className="flex min-h-full items-center justify-center p-4">
@@ -425,6 +461,8 @@ export function UserTable() {
                 <h3 className="text-lg font-semibold">Tạo tài khoản mới</h3>
                 <button onClick={() => setShowAdd(false)}><X className="h-5 w-5" /></button>
               </div>
+              
+              {/* Form tạo tài khoản mới*/}
               <div className="flex flex-col gap-3">
                 {[
                   { label: "Username *", field: "username" },
@@ -441,6 +479,8 @@ export function UserTable() {
                     />
                   </div>
                 ))}
+
+                {/* Role*/}
                 <div>
                   <label className="text-sm text-muted-foreground">Role</label>
                   <select
@@ -454,6 +494,8 @@ export function UserTable() {
                     <option value="employee">Nhân viên</option>
                   </select>
                 </div>
+                
+                {/* Gắn với nhân viên*/}
                 <div>
                   <label className="text-sm text-muted-foreground">Gắn với nhân viên</label>
                   <select
@@ -467,7 +509,10 @@ export function UserTable() {
                     ))}
                   </select>
                 </div>
+
               </div>
+
+              {/* Nút lưu thay đổi*/}
               <div className="flex gap-2 mt-4">
                 <Button variant="outline" className="flex-1" onClick={() => setShowAdd(false)}>Hủy</Button>
                 <Button className="flex-1" onClick={handleAdd}>Tạo</Button>
@@ -476,6 +521,8 @@ export function UserTable() {
           </div>
         </div>
       )}
+
+      {/* MODAL RESET THIẾT BỊ THEO PHÒNG / HOẶC HÀNG LOẠT */}
       {showResetModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50">
           <div className="flex min-h-full items-center justify-center p-4">
@@ -484,8 +531,11 @@ export function UserTable() {
                 <h3 className="text-lg font-semibold">Reset thiết bị</h3>
                 <button onClick={() => { setShowResetModal(false); setResetDeptId("") }}><X className="h-5 w-5" /></button>
               </div>
+
+              {/* Form reset thiết bị*/}
               <div className="flex flex-col gap-3">
                 <div>
+                  {/* Chọn phòng ban*/}
                   <label className="text-sm text-muted-foreground">Chọn phòng ban (để trống = reset tất cả)</label>
                   <select
                     className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
@@ -496,12 +546,16 @@ export function UserTable() {
                     {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
                 </div>
+
+                {/* Thông báo*/}
                 <p className="text-xs text-muted-foreground">
                   {resetDeptId
                     ? `Sẽ reset thiết bị cho tất cả nhân viên phòng "${departments.find(d => d.id === Number(resetDeptId))?.name}"`
                     : "Sẽ reset thiết bị cho TẤT CẢ nhân viên trong hệ thống"}
                 </p>
               </div>
+
+              {/* Nút lưu thay đổi*/}
               <div className="flex gap-2 mt-4">
                 <Button variant="outline" className="flex-1" onClick={() => { setShowResetModal(false); setResetDeptId("") }}>Hủy</Button>
                 <Button variant="destructive" className="flex-1" onClick={handleResetDevice} disabled={resetting}>

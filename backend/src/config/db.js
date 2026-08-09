@@ -11,7 +11,8 @@ const pool = mysql.createPool({
   timezone: '+07:00',
   dateStrings: true,
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 3,
+  queueLimit: 0,
   charset: 'utf8mb4',
 })
 

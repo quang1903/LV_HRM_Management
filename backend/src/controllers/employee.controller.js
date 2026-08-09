@@ -19,6 +19,12 @@ export async function getEmployees(req, res) {
       params.push(req.user.employee_id)
     }
 
+    // Employee chỉ thấy nhân viên thuộc phòng ban của mình
+    if (req.user.role === "employee") {
+      query += ` WHERE e.department_id = (SELECT department_id FROM employees WHERE id = ?) `
+      params.push(req.user.employee_id)
+    }
+
     query += " ORDER BY e.created_at DESC"
     const [rows] = await pool.execute(query, params)
 
@@ -79,28 +85,79 @@ export async function createEmployee(req, res) {
   const conn = await pool.getConnection()
   try {
     await conn.beginTransaction()
-
-    const { employee_code, full_name, email, phone, address, birth_date, gender, id_card, department_id, position_id, hire_date } = req.body
+    //Bóc tách thông tin điền từ Form, đính kèm 2 biến xác nhận thay thế Trưởng phòng
+    const { employee_code, full_name, email, phone, address, birth_date, gender, id_card, department_id, position_id, hire_date, confirm_replace_manager, new_position_for_old_manager } = req.body
+    //Kiểm tra dữ liệu đầu vào, cần 4 thông tin bắt buộc
     if (!employee_code || !full_name || !email || !hire_date) {
       await conn.rollback(); conn.release()
       return res.status(400).json({ message: "Vui lòng nhập đầy đủ thông tin bắt buộc" })
     }
+    //Kiểm tra định dạng email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       await conn.rollback(); conn.release()
       return res.status(400).json({ message: "Email không đúng định dạng" })
     }
+
+    //Kiểm tra email đã tồn tại chưa
     const [existing] = await conn.execute("SELECT id FROM employees WHERE email = ?", [email])
     if (existing.length > 0) {
       await conn.rollback(); conn.release()
       return res.status(400).json({ message: "Email đã tồn tại" })
     }
+
+    //Kiểm tra mã nhân viên đã tồn tại chưa
     const [existingCode] = await conn.execute("SELECT id FROM employees WHERE employee_code = ?", [employee_code])
     if (existingCode.length > 0) {
       await conn.rollback(); conn.release()
       return res.status(400).json({ message: "Mã nhân viên đã tồn tại" })
     }
 
+    //Kiểm tra TRƯỚC nếu chức vụ là Trưởng phòng và phòng đã có người
+    let isLeaderPosition = false
+    let oldManagerId = null
+    let empDeptId = null
+
+    //Xử lý khi chức vụ là Trưởng phòng
+    if (position_id) {
+      const [posRows] = await conn.execute("SELECT name, department_id FROM positions WHERE id = ?", [position_id])
+      if (posRows.length > 0 && posRows[0].name.toLowerCase().includes("trưởng phòng")) {
+        isLeaderPosition = true
+        empDeptId = posRows[0].department_id
+        
+        if (empDeptId) {
+          //Kiểm tra xem phòng ban này đã có Trưởng phòng (manager_id) chưa
+          const [deptRows] = await conn.execute(
+            `SELECT d.manager_id, e2.full_name as current_manager_name
+             FROM departments d LEFT JOIN employees e2 ON d.manager_id = e2.id
+             WHERE d.id = ?`, [empDeptId]
+          )
+          //Nếu ĐÃ CÓ Trưởng phòng cũ VÀ người dùng CHƯA bấm nút Xác nhận thay thế
+          if (deptRows.length > 0 && deptRows[0].manager_id) {
+            if (!confirm_replace_manager) {
+              await conn.rollback(); conn.release()
+              //Trả kèm danh sách chức vụ thường của phòng để frontend cho chọn
+              const [regularPositions] = await pool.execute(
+                "SELECT id, name FROM positions WHERE department_id = ? AND LOWER(name) NOT LIKE '%trưởng phòng%'",
+                [empDeptId]
+              )
+              //Trả về lỗi 409 kèm theo thông tin và danh sách chức vụ để chọn
+              return res.status(409).json({
+                need_confirm: true,
+                old_manager_name: deptRows[0].current_manager_name,
+                old_manager_id: deptRows[0].manager_id,
+                regular_positions: regularPositions,
+                message: `Phòng ban này đã có Trưởng phòng là "${deptRows[0].current_manager_name}". Bạn có muốn thay thế không?`
+              })
+            }
+            //Nếu ĐÃ bấm Xác nhận -> Lưu lại ID Trưởng phòng cũ để tí nữa tiến hành hạ chức
+            oldManagerId = deptRows[0].manager_id
+          }
+        }
+      }
+    }
+
+    //Chèn nhân viên mới vào bảng
     const [result] = await conn.execute(`
       INSERT INTO employees (employee_code, full_name, email, phone, address, birth_date, gender, id_card, department_id, position_id, hire_date, status)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Dang lam')
@@ -108,44 +165,44 @@ export async function createEmployee(req, res) {
 
     const employeeId = result.insertId
 
+    //Tự động sinh Username
     let baseUsername = email.split("@")[0]
     let username = baseUsername
     let counter = 1
+    //Kiểm tra trung them 1
     while (true) {
       const [dup] = await conn.execute("SELECT id FROM users WHERE username = ?", [username])
       if (dup.length === 0) break
       username = `${baseUsername}${counter}`
       counter++
     }
+
+    //Tự động tạo passWord
     const hashed = await bcrypt.hash("123456", 10)
     await conn.execute(`
       INSERT INTO users (username, email, password, role, employee_id, is_active)
       VALUES (?, ?, ?, 'employee', ?, 1)
     `, [username, email, hashed, employeeId])
 
-    // Kiểm tra chức vụ có phải Trưởng phòng không
-    if (position_id) {
-      const [posRows] = await conn.execute(
-        "SELECT name, department_id FROM positions WHERE id = ?", [position_id]
-      )
-      if (posRows.length > 0 && posRows[0].name.toLowerCase().includes("trưởng phòng")) {
-        // Nâng role lên manager
-        await conn.execute("UPDATE users SET role = 'manager' WHERE employee_id = ?", [employeeId])
-        // Gán manager_id cho phòng ban nếu chưa có
-        if (posRows[0].department_id) {
-          const [deptRows] = await conn.execute(
-            "SELECT manager_id FROM departments WHERE id = ?", [posRows[0].department_id]
-          )
-          if (deptRows.length > 0 && !deptRows[0].manager_id) {
-            await conn.execute(
-              "UPDATE departments SET manager_id = ? WHERE id = ?",
-              [employeeId, posRows[0].department_id]
-            )
-          }
-        }
+    //Nếu là Trưởng phòng: hạ role + đổi chức vụ người cũ, nâng người mới
+    if (isLeaderPosition && empDeptId) {
+      //Nếu có Trưởng phòng cũ bị thay thế
+      if (oldManagerId) {
+        //Hạ role của Trưởng phòng cũ xuống "employee"
+        await conn.execute("UPDATE users SET role = 'employee' WHERE employee_id = ?", [oldManagerId])
+        //Cập nhật chức vụ mới cho Trưởng phòng cũ
+        await conn.execute(
+          "UPDATE employees SET position_id = ? WHERE id = ?",
+          [new_position_for_old_manager || null, oldManagerId]
+        )
       }
+      //Nâng role người mới thành manager
+      await conn.execute("UPDATE users SET role = 'manager' WHERE employee_id = ?", [employeeId])
+      //Đặt người mới làm Trưởng phòng
+      await conn.execute("UPDATE departments SET manager_id = ? WHERE id = ?", [employeeId, empDeptId])
     }
 
+    //Lưu tất cả vào DB
     await conn.commit()
     conn.release()
     return res.status(201).json({ message: "Thêm nhân viên thành công", id: employeeId })
@@ -159,7 +216,7 @@ export async function createEmployee(req, res) {
 
 export async function updateEmployee(req, res) {
   try {
-    const { full_name, email, phone, address, birth_date, gender, id_card, department_id, position_id, hire_date } = req.body
+    const { full_name, email, phone, address, birth_date, gender, id_card, department_id, position_id, hire_date, confirm_replace_manager, new_position_for_old_manager } = req.body
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
@@ -172,6 +229,33 @@ export async function updateEmployee(req, res) {
     const [dupEmail] = await pool.execute("SELECT id FROM employees WHERE email = ? AND id != ?", [email, req.params.id])
     if (dupEmail.length > 0) return res.status(400).json({ message: "Email đã được sử dụng bởi nhân viên khác" })
 
+    //Kiểm tra TRƯỚC nếu đổi thành Trưởng phòng và phòng đã có người KHÁC
+    if (position_id) {
+      const [posRows] = await pool.execute("SELECT name, department_id FROM positions WHERE id = ?", [position_id])
+      if (posRows.length > 0 && posRows[0].name.toLowerCase().includes("trưởng phòng") && posRows[0].department_id) {
+        const empDeptIdCheck = posRows[0].department_id
+        const [deptRows] = await pool.execute(
+          `SELECT d.manager_id, e2.full_name as current_manager_name
+           FROM departments d LEFT JOIN employees e2 ON d.manager_id = e2.id
+           WHERE d.id = ?`, [empDeptIdCheck]
+        )
+        //Nếu phòng đã có Trưởng phòng KHÁC với nhân viên đang sửa VÀ chưa bấm nút xác nhận
+        if (deptRows.length > 0 && deptRows[0].manager_id && deptRows[0].manager_id !== Number(req.params.id) && !confirm_replace_manager) {
+          const [regularPositions] = await pool.execute(
+            "SELECT id, name FROM positions WHERE department_id = ? AND LOWER(name) NOT LIKE '%trưởng phòng%'",
+            [empDeptIdCheck]
+          )
+          return res.status(409).json({
+            need_confirm: true,
+            old_manager_name: deptRows[0].current_manager_name,
+            old_manager_id: deptRows[0].manager_id,
+            regular_positions: regularPositions,
+            message: `Phòng ban này đã có Trưởng phòng là "${deptRows[0].current_manager_name}". Bạn có muốn thay thế không?`
+          })
+        }
+      }
+    }
+
     await pool.execute(`
       UPDATE employees SET full_name=?, email=?, phone=?, address=?, birth_date=?, gender=?, id_card=?, department_id=?, position_id=?, hire_date=?
       WHERE id=?
@@ -179,30 +263,42 @@ export async function updateEmployee(req, res) {
 
     await pool.execute("UPDATE users SET email = ? WHERE employee_id = ?", [email, req.params.id])
 
-    // Kiểm tra chức vụ mới có phải Trưởng phòng không
+    //Nâng / Hạ role
     if (position_id) {
       const [posRows] = await pool.execute("SELECT name, department_id FROM positions WHERE id = ?", [position_id])
       if (posRows.length > 0) {
         const isLeader = posRows[0].name.toLowerCase().includes("trưởng phòng")
         const empDeptId = posRows[0].department_id
 
+        //Nâng role lên Manager
         if (isLeader && empDeptId) {
-          // Nâng role lên manager (không hạ role của admin và hr)
           const [userRows2] = await pool.execute("SELECT role FROM users WHERE employee_id = ?", [req.params.id])
           if (userRows2.length > 0 && userRows2[0].role !== 'admin' && userRows2[0].role !== 'hr') {
             await pool.execute("UPDATE users SET role = 'manager' WHERE employee_id = ?", [req.params.id])
           }
 
-          // Xóa manager_id ở phòng ban cũ nếu có
+          //Hạ role + đổi chức vụ Trưởng phòng CŨ (nếu bị thay thế)
+          const [deptRows] = await pool.execute("SELECT manager_id FROM departments WHERE id = ?", [empDeptId])
+          if (deptRows.length > 0 && deptRows[0].manager_id && deptRows[0].manager_id !== Number(req.params.id)) {
+            const oldManagerId = deptRows[0].manager_id
+            const [oldRole] = await pool.execute("SELECT role FROM users WHERE employee_id = ?", [oldManagerId])
+            if (oldRole.length > 0 && oldRole[0].role === 'manager') {
+              await pool.execute("UPDATE users SET role = 'employee' WHERE employee_id = ?", [oldManagerId])
+              await pool.execute(
+                "UPDATE employees SET position_id = ? WHERE id = ?",
+                [new_position_for_old_manager || null, oldManagerId]
+              )
+            }
+          }
+
+          // Cập nhật manager_id phòng ban mới thành Nhân viên này
           await pool.execute(
             "UPDATE departments SET manager_id = NULL WHERE manager_id = ? AND id != ?",
             [req.params.id, empDeptId]
           )
-
-          // Gán manager_id cho phòng ban mới
           await pool.execute("UPDATE departments SET manager_id = ? WHERE id = ?", [req.params.id, empDeptId])
         } else {
-          // Hạ role về employee + bỏ manager_id nếu đang là trưởng phòng
+          // Nếu chuyển từ Trưởng phòng xuống chức vụ thường -> Hạ role về 'employee' và xóa manager_id ở phòng ban
           const [userRows] = await pool.execute("SELECT role FROM users WHERE employee_id = ?", [req.params.id])
           if (userRows.length > 0 && userRows[0].role === "manager") {
             await pool.execute("UPDATE users SET role = 'employee' WHERE employee_id = ?", [req.params.id])
@@ -218,6 +314,7 @@ export async function updateEmployee(req, res) {
   }
 }
 
+//vô hiệu hóa / nghỉ
 export async function deactivateEmployee(req, res) {
   try {
     const [existing] = await pool.execute("SELECT id FROM employees WHERE id = ?", [req.params.id])
@@ -225,6 +322,7 @@ export async function deactivateEmployee(req, res) {
     const [contracts] = await pool.execute("SELECT id FROM contracts WHERE employee_id = ? AND status = 'Dang hieu luc'", [req.params.id])
     if (contracts.length > 0) return res.status(400).json({ message: "Nhân viên còn hợp đồng đang hiệu lực" })
     await pool.execute("UPDATE employees SET status = 'Nghi viec' WHERE id = ?", [req.params.id])
+    //ko cho dn is_active = 0
     await pool.execute("UPDATE users SET is_active = 0 WHERE employee_id = ?", [req.params.id])
 
     // Hủy manager_id phòng ban nếu đang là Trưởng phòng
@@ -245,7 +343,9 @@ export async function activateEmployee(req, res) {
   try {
     const [existing] = await pool.execute("SELECT id, status FROM employees WHERE id = ?", [req.params.id])
     if (existing.length === 0) return res.status(404).json({ message: "Không tìm thấy nhân viên" })
+    //ko cần kích hoạt lại
     if (existing[0].status !== 'Nghi viec') return res.status(400).json({ message: "Nhân viên đang làm việc rồi" })
+    //nếu bị vô hiệu hóa thì cho phép đăng nhập lại
     await pool.execute("UPDATE employees SET status = 'Dang lam' WHERE id = ?", [req.params.id])
     await pool.execute("UPDATE users SET is_active = 1 WHERE employee_id = ?", [req.params.id])
     return res.json({ message: "Kích hoạt nhân viên thành công" })
@@ -254,6 +354,7 @@ export async function activateEmployee(req, res) {
   }
 }
 
+//xoa vinh vien
 export async function permanentDelete(req, res) {
   try {
     const [existing] = await pool.execute("SELECT id, status FROM employees WHERE id = ?", [req.params.id])
@@ -261,11 +362,11 @@ export async function permanentDelete(req, res) {
     if (existing[0].status !== 'Nghi viec') return res.status(400).json({ message: "Chỉ xóa được nhân viên đã nghỉ việc" })
 
     // Xóa dữ liệu liên quan trước tránh lỗi Foreign Key Constraint
-    await pool.execute("DELETE FROM attendances WHERE employee_id = ?", [req.params.id])
-    await pool.execute("DELETE FROM leave_requests WHERE employee_id = ?", [req.params.id])
-    await pool.execute("DELETE FROM contracts WHERE employee_id = ?", [req.params.id])
-    await pool.execute("DELETE FROM profile_change_requests WHERE employee_id = ?", [req.params.id])
-    await pool.execute("UPDATE departments SET manager_id = NULL WHERE manager_id = ?", [req.params.id])
+    await pool.execute("DELETE FROM attendances WHERE employee_id = ?", [req.params.id]) // Xóa lịch sử chấm công
+    await pool.execute("DELETE FROM leave_requests WHERE employee_id = ?", [req.params.id]) // Xóa yêu cầu nghỉ phép
+    await pool.execute("DELETE FROM contracts WHERE employee_id = ?", [req.params.id]) // Xóa hợp đồng
+    await pool.execute("DELETE FROM profile_change_requests WHERE employee_id = ?", [req.params.id]) // Xóa yêu cầu thay đổi thông tin
+    await pool.execute("UPDATE departments SET manager_id = NULL WHERE manager_id = ?", [req.params.id]) // Xóa manager_id nếu đang là Trưởng phòng
 
     await pool.execute("DELETE FROM users WHERE employee_id = ?", [req.params.id])
     await pool.execute("DELETE FROM employees WHERE id = ?", [req.params.id])
@@ -283,14 +384,16 @@ export async function getMyQRSecret(req, res) {
     const [rows] = await pool.execute("SELECT employee_code FROM employees WHERE id = ?", [req.user.employee_id])
     if (rows.length === 0) return res.status(404).json({ message: "Không tìm thấy nhân viên" })
 
+    //Tạo chuỗi bí mật kết hợp giữa Secret Key hệ thống + Mã nhân viên
     const secret = process.env.QR_SECRET_KEY + rows[0].employee_code
+    //Tạo ra mã OTP động thay đổi mỗi 30 giây (Thuật toán TOTP )
     const code = generateTotp(secret)
 
     return res.json({
       employee_code: rows[0].employee_code,
       otp: code,
       qr_value: `${rows[0].employee_code}:${code}`,
-      expires_in: 30 - Math.floor(Date.now() / 1000) % 30
+      expires_in: 30 - Math.floor(Date.now() / 1000) % 30 // Số giây còn lại của chu kỳ 30s
     })
   } catch (err) {
     console.error(err)
@@ -308,10 +411,12 @@ export async function importEmployees(req, res) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     let successCount = 0
     const errors = []
+    const warnings = []
 
     // Tính hash mật khẩu mặc định 1 LẦN DUY NHẤT trước vòng lặp, không tính lại cho từng dòng
     const defaultPasswordHash = await bcrypt.hash("123456", 10)
 
+    //tìm manv lớn nhất rồi bắt đầu tăng
     const [maxRows] = await pool.execute(
       "SELECT employee_code FROM employees WHERE employee_code LIKE 'EMP%' ORDER BY CAST(SUBSTRING(employee_code, 4) AS UNSIGNED) DESC LIMIT 1"
     )
@@ -320,9 +425,11 @@ export async function importEmployees(req, res) {
       maxCode = parseInt(maxRows[0].employee_code.replace("EMP", "")) || 0
     }
 
+    //Nạp sẵn toàn bộ Phòng ban và Chức vụ vào RAM để đối chiếu cho nhanh
     const [allDepartments] = await pool.execute("SELECT id, name FROM departments")
     const [allPositions] = await pool.execute("SELECT id, name, department_id FROM positions")
 
+    //chạy
     for (let i = 0; i < data.length; i++) {
       const row = data[i]
       const rowNumber = i + 2
@@ -340,22 +447,27 @@ export async function importEmployees(req, res) {
         const address = (row["Địa chỉ"] || "").toString().trim() || null
         const roleRaw = (row["Vai trò"] || "").toString().trim().toLowerCase()
 
+
+        //bắt lỗi bỏ qua
         if (!full_name || !email || !hire_date_raw) {
           errors.push(`Dòng ${rowNumber}: Thiếu Họ tên, Email hoặc Ngày vào làm`)
           continue
         }
 
+        // y vậy
         if (!emailRegex.test(email)) {
           errors.push(`Dòng ${rowNumber}: Email "${email}" không đúng định dạng`)
           continue
         }
 
+        //y vậy
         const [dupEmail] = await pool.execute("SELECT id FROM employees WHERE email = ?", [email])
         if (dupEmail.length > 0) {
           errors.push(`Dòng ${rowNumber}: Email "${email}" đã tồn tại trong hệ thống`)
           continue
         }
 
+        //tìm ID phòng ban khớp với Tên phòng ban gõ trong Excel
         let department_id = null
         if (dept_name) {
           const dept = allDepartments.find(d => d.name.toLowerCase() === dept_name.toLowerCase())
@@ -379,6 +491,7 @@ export async function importEmployees(req, res) {
           position_id = pos.id
         }
 
+        // xử lý ngày tháng
         const hire_date = normalizeExcelDate(hire_date_raw)
         if (!hire_date) {
           errors.push(`Dòng ${rowNumber}: Ngày vào làm không hợp lệ`)
@@ -393,19 +506,21 @@ export async function importEmployees(req, res) {
           else gender = "Khac"
         }
 
+        //Kiểm tra Vai trò: Nếu gõ vai trò lạ -> Đẩy vào `warnings` và gán mặc định 'employee'
         const validRoles = ["admin", "hr", "manager", "employee"]
         let userRole = "employee"
         if (roleRaw) {
           if (validRoles.includes(roleRaw)) {
             userRole = roleRaw
           } else {
-            errors.push(`Dòng ${rowNumber}: Vai trò "${row["Vai trò"]}" không hợp lệ (chỉ nhận admin/hr/manager/employee), đã dùng mặc định employee`)
+            warnings.push(`Dòng ${rowNumber}: Vai trò "${row["Vai trò"]}" không hợp lệ (chỉ nhận admin/hr/manager/employee), đã dùng mặc định employee`)
           }
         }
 
         maxCode += 1
         const employee_code = `EMP${String(maxCode).padStart(3, "0")}`
 
+        //Thêm nhân viên 
         const [result] = await pool.execute(`
           INSERT INTO employees (employee_code, full_name, email, phone, address, birth_date, gender, id_card, department_id, position_id, hire_date, status)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Dang lam')
@@ -418,7 +533,7 @@ export async function importEmployees(req, res) {
         if (userRole === "manager") {
           if (!department_id) {
             finalRole = "employee"
-            errors.push(`Dòng ${rowNumber}: "${full_name}" ghi Vai trò "manager" nhưng không chọn Phòng ban, đã hạ về employee`)
+            warnings.push(`Dòng ${rowNumber}: "${full_name}" ghi Vai trò "manager" nhưng không chọn Phòng ban, đã hạ về employee`)
           } else {
             const [deptRows] = await pool.execute(
               `SELECT d.manager_id, e2.full_name as current_manager_name
@@ -427,6 +542,7 @@ export async function importEmployees(req, res) {
                WHERE d.id = ?`,
               [department_id]
             )
+            // Nếu phòng CHƯA có Trưởng phòng -> Gán làm Trưởng phòng luôn
             if (deptRows.length > 0 && !deptRows[0].manager_id) {
               await pool.execute("UPDATE departments SET manager_id = ? WHERE id = ?", [employeeId, department_id])
 
@@ -443,11 +559,12 @@ export async function importEmployees(req, res) {
             } else {
               finalRole = "employee"
               const currentManagerName = deptRows[0]?.current_manager_name || "không xác định"
-              errors.push(`Dòng ${rowNumber}: Phòng "${dept_name}" đã có Trưởng phòng là "${currentManagerName}", "${full_name}" đã được hạ về role employee thay vì manager`)
+              warnings.push(`Dòng ${rowNumber}: Phòng "${dept_name}" đã có Trưởng phòng là "${currentManagerName}", "${full_name}" đã được hạ về role employee thay vì manager`)
             }
           }
         }
 
+        // Tạo Username và lưu vào bảng users
         let baseUsername = email.split("@")[0]
         let username = baseUsername
         let counter = 1
@@ -462,20 +579,21 @@ export async function importEmployees(req, res) {
           VALUES (?, ?, ?, ?, ?, 1)
         `, [username, email, defaultPasswordHash, finalRole, employeeId])
 
-        successCount++
+        successCount++ // Tăng số lượng dòng nhập thành công lên 1
       } catch (rowErr) {
         console.error(`Lỗi dòng ${rowNumber}:`, rowErr)
         errors.push(`Dòng ${rowNumber}: Lỗi xử lý không xác định`)
       }
     }
 
-    return res.json({ success: true, successCount, totalRows: data.length, errors })
+    return res.json({ success: true, successCount, totalRows: data.length, errors, warnings })
   } catch (err) {
     console.error(err)
     return res.status(500).json({ message: "Lỗi server khi import" })
   }
 }
 
+// Hàm chuyển đổi ngày tháng
 function normalizeExcelDate(value) {
   if (!value) return null
 
@@ -492,6 +610,7 @@ function normalizeExcelDate(value) {
   return date.toISOString().split("T")[0]
 }
 
+// Hàm Reset khóa thiết bị cho TẤT CẢ Nhân viên (xóa sạch device_id của tất cả trừ Admin)
 export async function resetDeviceAll(req, res) {
   try {
     const [result] = await pool.execute(
