@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react"
 import Chart from "chart.js/auto"
 import { attendanceService } from "@/services/attendance"
 import { exportToExcel } from "@/lib/exportExcel"
-import { Download, Users, Clock, FileText, TrendingUp, Loader2 } from "lucide-react"
+import { Download, Users, Clock, FileText, TrendingUp, Loader2, DollarSign } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn, formatDate } from "@/lib/utils"
@@ -131,7 +131,7 @@ function AttendanceDoughnutChart({ stats }: { stats: { dung_gio: number; di_tre:
 
 //Bảng tổng quan theo phòng ban
 export function ReportsPanel() {
-  const [activeTab, setActiveTab] = useState<"attendance" | "department" | "leave" | "contract">("attendance")
+  const [activeTab, setActiveTab] = useState<"attendance" | "department" | "leave" | "contract" | "salary">("attendance")
   const [month, setMonth] = useState(new Date().getMonth() + 1)
   const [year, setYear] = useState(new Date().getFullYear())
 
@@ -140,12 +140,14 @@ export function ReportsPanel() {
   const [departmentData, setDepartmentData] = useState<any[]>([])
   const [leaveData, setLeaveData] = useState<any[]>([])
   const [contractData, setContractData] = useState<{ summary: any[]; expiring: any[] }>({ summary: [], expiring: [] })
+  const [salaryData, setSalaryData] = useState<any[]>([])
 
   //state loading
   const [loadingAttendance, setLoadingAttendance] = useState(false)
   const [loadingDepartment, setLoadingDepartment] = useState(false)
   const [loadingLeave, setLoadingLeave] = useState(false)
   const [loadingContract, setLoadingContract] = useState(false)
+  const [loadingSalary, setLoadingSalary] = useState(false)
 
   const [dailyData, setDailyData] = useState<{ date: string; count: number }[]>([])
 
@@ -189,7 +191,7 @@ export function ReportsPanel() {
 
   // TẢI DỮ LIỆU BÁO CÁO KHI ĐỔI THÁNG/NĂM
   useEffect(() => { fetchDepartment(); fetchContract() }, [])
-  useEffect(() => { fetchAttendance(); fetchLeave() }, [month, year])
+  useEffect(() => { fetchAttendance(); fetchLeave(); fetchSalary() }, [month, year])
 
   //Hàm lấy dữ liệu chấm công
   const fetchAttendance = async () => {
@@ -211,14 +213,22 @@ export function ReportsPanel() {
     try { setLoadingContract(true); const res = await reportService.getContract(); setContractData(res.data) }
     catch { } finally { setLoadingContract(false) }
   }
+  //Hàm lấy dữ liệu bảng lương
+  const fetchSalary = async () => {
+    try { setLoadingSalary(true); const res = await reportService.getSalary(month, year); setSalaryData(res.data) }
+    catch { } finally { setLoadingSalary(false) }
+  }
   //Hàm đếm số lượng hợp đồng theo trạng thái
   const contractCount = (status: string) => contractData.summary.find(s => s.status === status)?.total || 0
+  const formatMoney = (n: number) => (n || 0).toLocaleString("vi-VN")
+
   //Danh sách các tab báo cáo
   const tabs = [
     { key: "attendance", label: "Chấm công", icon: Clock },
     { key: "department", label: "Phòng ban", icon: Users },
     { key: "leave", label: "Nghỉ phép", icon: FileText },
     { key: "contract", label: "Hợp đồng", icon: TrendingUp },
+    { key: "salary", label: "Bảng lương", icon: DollarSign },
   ]
 
   return (
@@ -258,7 +268,7 @@ export function ReportsPanel() {
 
       {/* VẼ 2 BIỂU ĐỒ */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        
+
         {/* Biểu đồ cột hiển thị số lượng chấm công theo từng ngày */}
         <div className="lg:col-span-2 rounded-xl border border-border bg-background p-5">
           <h3 className="text-sm font-semibold mb-4">Chấm công theo ngày</h3>
@@ -268,7 +278,7 @@ export function ReportsPanel() {
           }
         </div>
 
-        {/* Biểu đồ tròn hiển thị tỷ lệ các loại chấm công */} 
+        {/* Biểu đồ tròn hiển thị tỷ lệ các loại chấm công */}
         <div className="rounded-xl border border-border bg-background p-5">
           <h3 className="text-sm font-semibold mb-4">Tỷ lệ chấm công</h3>
           {stats && (stats.dung_gio + stats.di_tre + stats.vang_mat + stats.ve_som) > 0
@@ -492,6 +502,63 @@ export function ReportsPanel() {
             </Card>
           )}
         </div>
+      )}
+
+      {/* Tab Bảng lương */}
+      {activeTab === "salary" && (
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold">Bảng lương tháng {month}/{year}</h3>
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => exportToExcel(
+              salaryData,
+              [
+                { key: "full_name", label: "Nhân viên" },
+                { key: "department_name", label: "Phòng ban" },
+                { key: "contract_type", label: "Loại HĐ" },
+                { key: "base_salary", label: "Lương cơ bản" },
+                { key: "work_days", label: "Ngày công" },
+                { key: "leave_days", label: "Ngày phép" },
+                { key: "unexcused_absent", label: "Vắng không phép" },
+                { key: "actual_salary", label: "Lương thực nhận" },
+              ],
+              `Bang_luong_thang_${month}_${year}`
+            )}><Download className="h-4 w-4" />Xuất Excel</Button>
+          </div>
+          {loadingSalary ? <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] text-sm">
+                <thead className="bg-muted/50">
+                  <tr className="text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <th className="px-4 py-3">Nhân viên</th>
+                    <th className="px-4 py-3">Phòng ban</th>
+                    <th className="px-4 py-3">Loại HĐ</th>
+                    <th className="px-4 py-3">Lương cơ bản</th>
+                    <th className="px-4 py-3">Ngày công</th>
+                    <th className="px-4 py-3">Ngày phép</th>
+                    <th className="px-4 py-3">Vắng không phép</th>
+                    <th className="px-4 py-3">Lương thực nhận</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {salaryData.length === 0 ? (
+                    <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">Không có dữ liệu tháng {month}/{year}</td></tr>
+                  ) : salaryData.map((emp, i) => (
+                    <tr key={i} className="hover:bg-muted/40">
+                      <td className="px-4 py-3 font-medium">{emp.full_name}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{emp.department_name}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{emp.contract_type || "—"}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{formatMoney(emp.base_salary)} đ</td>
+                      <td className="px-4 py-3 text-emerald-600 font-medium">{emp.work_days}</td>
+                      <td className="px-4 py-3 text-blue-600 font-medium">{emp.leave_days}</td>
+                      <td className="px-4 py-3 text-rose-600 font-medium">{emp.unexcused_absent}</td>
+                      <td className="px-4 py-3 font-semibold text-primary">{formatMoney(emp.actual_salary)} đ</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
       )}
     </div>
   )
