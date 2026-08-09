@@ -215,3 +215,75 @@ export async function getSalaryReport(req, res) {
     return res.status(500).json({ message: "Lỗi server" })
   }
 }
+
+// Báo Cáo Lương Cá Nhân (Nhân viên tự xem lương của mình)
+export async function getMySalaryReport(req, res) {
+  try {
+    if (!req.user.employee_id) {
+      return res.status(400).json({ message: "Tài khoản chưa gắn với hồ sơ nhân viên" })
+    }
+
+    const { month, year } = req.query
+    const nowVN = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" }))
+    const m = month || (nowVN.getMonth() + 1)
+    const y = year || nowVN.getFullYear()
+
+    const mm = String(m).padStart(2, "0")
+    const startDate = `${y}-${mm}-01`
+    const lastDay = new Date(y, m, 0).getDate()
+    const endDate = `${y}-${mm}-${String(lastDay).padStart(2, "0")}`
+
+    const [rows] = await pool.execute(`
+      SELECT
+        e.id, e.full_name, e.employee_code,
+        d.name as department_name,
+        c.salary as base_salary,
+        c.contract_type,
+        COALESCE(att.work_days, 0) as work_days,
+        COALESCE(att.absent_days, 0) as absent_days,
+        COALESCE(lv.leave_days, 0) as leave_days
+      FROM employees e
+      LEFT JOIN departments d ON e.department_id = d.id
+      LEFT JOIN contracts c ON c.employee_id = e.id AND c.status = 'Dang hieu luc'
+      LEFT JOIN (
+        SELECT 
+          employee_id,
+          COUNT(CASE WHEN status IN ('Dung gio','Di tre','Ve som') THEN 1 END) as work_days,
+          COUNT(CASE WHEN status = 'Vang mat' THEN 1 END) as absent_days
+        FROM attendances
+        WHERE work_date BETWEEN ? AND ? AND employee_id = ?
+        GROUP BY employee_id
+      ) att ON att.employee_id = e.id
+      LEFT JOIN (
+        SELECT 
+          employee_id,
+          SUM(total_days) as leave_days
+        FROM leave_requests
+        WHERE start_date BETWEEN ? AND ? AND status = 'Da duyet' AND employee_id = ?
+        GROUP BY employee_id
+      ) lv ON lv.employee_id = e.id
+      WHERE e.id = ?
+    `, [startDate, endDate, req.user.employee_id, startDate, endDate, req.user.employee_id, req.user.employee_id])
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "Không tìm thấy dữ liệu" })
+    }
+
+    const STANDARD_WORKDAYS = 26
+    const PROBATION_RATE = 0.85
+    const r = rows[0]
+
+    const typeStr = (r.contract_type || "").trim().toLowerCase()
+    const isProbation = typeStr === "thu viec" || typeStr === "thử việc"
+    const rate = isProbation ? PROBATION_RATE : 1.0
+    const baseSalary = Number(r.base_salary || 0)
+    const dailyRate = baseSalary > 0 ? baseSalary / STANDARD_WORKDAYS : 0
+    const actualSalary = Math.round(dailyRate * (Number(r.work_days) + Number(r.leave_days)) * rate)
+    const unexcusedAbsent = Math.max(0, Number(r.absent_days) - Number(r.leave_days))
+
+    return res.json({ ...r, actual_salary: actualSalary, unexcused_absent: unexcusedAbsent })
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ message: "Lỗi server" })
+  }
+}

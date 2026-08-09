@@ -220,7 +220,8 @@ export function ReportsPanel() {
   }
   //Hàm đếm số lượng hợp đồng theo trạng thái
   const contractCount = (status: string) => contractData.summary.find(s => s.status === status)?.total || 0
-  const formatMoney = (n: number) => (n || 0).toLocaleString("vi-VN")
+  const formatMoney = (n: any) => Number(n || 0).toLocaleString("vi-VN")
+  const isCurrentMonth = month === new Date().getMonth() + 1 && year === new Date().getFullYear()
 
   //Danh sách các tab báo cáo
   const tabs = [
@@ -347,7 +348,7 @@ export function ReportsPanel() {
                       <td className="px-4 py-3 text-amber-600 font-medium">{emp.late}</td>
                       <td className="px-4 py-3 text-rose-600 font-medium">{emp.absent}</td>
                       <td className="px-4 py-3 text-muted-foreground">
-                        {emp.total_work_minutes ? `${Math.floor(emp.total_work_minutes / 60)}h` : "—"}
+                        {emp.total_work_minutes > 0 ? `${(emp.total_work_minutes / 60).toFixed(1)}h` : "—"}
                       </td>
                     </tr>
                   ))}
@@ -508,7 +509,15 @@ export function ReportsPanel() {
       {activeTab === "salary" && (
         <Card className="p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold">Bảng lương tháng {month}/{year}</h3>
+            <div>
+              <h3 className="font-semibold">Bảng lương tháng {month}/{year}</h3>
+              <span className={cn(
+                "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium mt-1",
+                isCurrentMonth ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"
+              )}>
+                {isCurrentMonth ? "⏳ Tạm tính (tháng đang diễn ra)" : "✓ Chính thức"}
+              </span>
+            </div>
             <Button variant="outline" size="sm" className="gap-2" onClick={() => exportToExcel(
               salaryData,
               [

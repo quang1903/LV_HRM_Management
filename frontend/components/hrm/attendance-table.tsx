@@ -245,7 +245,7 @@ export function AttendanceTable() {
                     {att.check_out
                       ? att.work_minutes < 1
                         ? "< 1 phút"
-                        : `${Math.floor(att.work_minutes / 60)}h${att.work_minutes % 60 > 0 ? `${att.work_minutes % 60}p` : ""}`
+                        : `${(att.work_minutes / 60).toFixed(1)}h`
                       : "—"}
                   </td>
                   <td className="px-5 py-4">
