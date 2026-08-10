@@ -188,7 +188,9 @@ export async function getSalaryReport(req, res) {
           employee_id,
           SUM(total_days) as leave_days
         FROM leave_requests
-        WHERE start_date BETWEEN ? AND ? AND status = 'Da duyet'
+        WHERE start_date BETWEEN ? AND ? 
+          AND status = 'Da duyet'
+          AND request_type != 'Nghi khong luong'
         GROUP BY employee_id
       ) lv ON lv.employee_id = e.id
       WHERE e.status = 'Dang lam'
@@ -259,7 +261,10 @@ export async function getMySalaryReport(req, res) {
           employee_id,
           SUM(total_days) as leave_days
         FROM leave_requests
-        WHERE start_date BETWEEN ? AND ? AND status = 'Da duyet' AND employee_id = ?
+        WHERE start_date BETWEEN ? AND ? 
+          AND status = 'Da duyet' 
+          AND employee_id = ?
+          AND request_type != 'Nghi khong luong'
         GROUP BY employee_id
       ) lv ON lv.employee_id = e.id
       WHERE e.id = ?

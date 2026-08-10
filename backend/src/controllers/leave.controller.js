@@ -64,6 +64,7 @@ export async function getLeaveById(req, res) {
 export async function createLeave(req, res) {
   try {
     let { employee_id, request_type, start_date, end_date, reason } = req.body
+    const attachment_url = req.file ? `/uploads/leave-attachments/${req.file.filename}` : null
 
     // Chống IDOR: nhân viên chỉ được gửi đơn cho chính mình
     if (req.user.role === "employee") {
@@ -93,17 +94,62 @@ export async function createLeave(req, res) {
     }
 
     // Backend tự tính total_days, KHÔNG nhận từ Client để chống gian lận.
-    // Tính từng ngày trong khoảng, chỉ loại trừ Chủ nhật (Thứ 7 vẫn tính là ngày làm việc bình thường).
     const total_days = countWorkingDays(start_date, end_date)
     if (total_days <= 0) {
       return res.status(400).json({ message: "Khoảng ngày nghỉ không hợp lệ (toàn bộ là Chủ nhật)" })
     }
 
+    // Kiểm tra quỹ phép năm — chỉ áp dụng cho loại "Nghi phep"
+    if (request_type === 'Nghi phep') {
+      const ANNUAL_LEAVE_DAYS = 12
+      const currentYear = new Date(start_date).getFullYear()
+
+      const [usedRows] = await pool.execute(`
+        SELECT COALESCE(SUM(total_days), 0) as used_days
+        FROM leave_requests
+        WHERE employee_id = ?
+        AND request_type = 'Nghi phep'
+        AND status IN ('Cho duyet', 'Da duyet')
+        AND YEAR(start_date) = ?
+      `, [employee_id, currentYear])
+
+      const usedDays = Number(usedRows[0].used_days)
+      const remainingDays = ANNUAL_LEAVE_DAYS - usedDays
+
+      if (total_days > remainingDays) {
+        return res.status(400).json({
+          message: remainingDays > 0
+            ? `Bạn chỉ còn ${remainingDays} ngày phép năm, nhưng đơn này xin ${total_days} ngày. Vui lòng chọn loại "Nghỉ không lương" nếu muốn nghỉ thêm.`
+            : `Bạn đã sử dụng hết 12 ngày phép năm ${currentYear}. Vui lòng chọn loại "Nghỉ không lương" nếu muốn nghỉ thêm.`
+        })
+      }
+    }
+
+    // ⭐ MỚI: Kiểm tra số ngày tối đa cho "Nghi thai san" theo giới tính
+    if (request_type === 'Nghi thai san') {
+      const [empRows] = await pool.execute("SELECT gender FROM employees WHERE id = ?", [employee_id])
+      const gender = empRows[0]?.gender
+
+      const MAX_MATERNITY_FEMALE = 180
+      const MAX_MATERNITY_MALE = 14
+
+      if (gender === 'Nu' && total_days > MAX_MATERNITY_FEMALE) {
+        return res.status(400).json({
+          message: `Số ngày nghỉ thai sản (lao động nữ) không được vượt quá ${MAX_MATERNITY_FEMALE} ngày theo quy định.`
+        })
+      }
+      if (gender === 'Nam' && total_days > MAX_MATERNITY_MALE) {
+        return res.status(400).json({
+          message: `Số ngày nghỉ thai sản (lao động nam) không được vượt quá ${MAX_MATERNITY_MALE} ngày theo quy định.`
+        })
+      }
+    }
+
     //Lưu đơn xin nghỉ vào DB với trạng thái ban đầu 'Cho duyet'
     const [result] = await pool.execute(`
-      INSERT INTO leave_requests (employee_id, request_type, start_date, end_date, total_days, reason, status)
-      VALUES (?, ?, ?, ?, ?, ?, 'Cho duyet')
-    `, [employee_id, request_type, start_date, end_date, total_days, reason || null])
+      INSERT INTO leave_requests (employee_id, request_type, start_date, end_date, total_days, reason, attachment_url, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'Cho duyet')
+    `, [employee_id, request_type, start_date, end_date, total_days, reason || null, attachment_url])
     return res.status(201).json({ message: "Gửi đơn nghỉ phép thành công", id: result.insertId, total_days })
   } catch (err) {
     console.error(err)
@@ -138,7 +184,7 @@ export async function approveLeave(req, res) {
       [req.params.id]
     )
     if (existing.length === 0) return res.status(404).json({ message: "Không tìm thấy đơn" })
-    
+
     if (existing[0].status !== 'Cho duyet') return res.status(400).json({ message: "Đơn đã được xử lý" })
 
     // Chặn Trưởng phòng tự duyệt đơn của chính mình
@@ -254,6 +300,40 @@ export async function rejectLeave(req, res) {
 
     return res.json({ message: "Từ chối đơn thành công" })
   } catch (err) {
+    return res.status(500).json({ message: "Lỗi server" })
+  }
+}
+
+// Lấy số ngày phép năm còn lại của chính nhân viên đang đăng nhập
+export async function getLeaveBalance(req, res) {
+  try {
+    if (!req.user.employee_id) {
+      return res.status(400).json({ message: "Tài khoản chưa được gắn với nhân viên" })
+    }
+
+    const ANNUAL_LEAVE_DAYS = 12
+    const currentYear = new Date().getFullYear()
+
+    const [rows] = await pool.execute(`
+      SELECT COALESCE(SUM(total_days), 0) as used_days
+      FROM leave_requests
+      WHERE employee_id = ?
+      AND request_type = 'Nghi phep'
+      AND status = 'Da duyet'
+      AND YEAR(start_date) = ?
+    `, [req.user.employee_id, currentYear])
+
+    const usedDays = Number(rows[0].used_days)
+    const remainingDays = Math.max(0, ANNUAL_LEAVE_DAYS - usedDays)
+
+    return res.json({
+      total: ANNUAL_LEAVE_DAYS,
+      used: usedDays,
+      remaining: remainingDays,
+      year: currentYear,
+    })
+  } catch (err) {
+    console.error(err)
     return res.status(500).json({ message: "Lỗi server" })
   }
 }

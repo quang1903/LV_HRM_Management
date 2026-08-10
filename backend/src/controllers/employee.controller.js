@@ -1,7 +1,20 @@
 import pool from "../config/db.js"
 import bcrypt from "bcrypt"
 import dotenv from "dotenv"
+import dns from "dns/promises"
 dotenv.config()
+
+async function isEmailDomainValid(email) {
+  const domain = email.split("@")[1]
+  if (!domain) return false
+  if (domain.toLowerCase() === "hrm.com") return true
+  try {
+    const records = await dns.resolveMx(domain)
+    return records && records.length > 0
+  } catch {
+    return false
+  }
+}
 
 export async function getEmployees(req, res) {
   try {
@@ -97,6 +110,12 @@ export async function createEmployee(req, res) {
     if (!emailRegex.test(email)) {
       await conn.rollback(); conn.release()
       return res.status(400).json({ message: "Email không đúng định dạng" })
+    }
+
+    const isValidDomain = await isEmailDomainValid(email)
+    if (!isValidDomain) {
+      await conn.rollback(); conn.release()
+      return res.status(400).json({ message: "Email không tồn tại hoặc domain không hợp lệ" })
     }
 
     //Kiểm tra email đã tồn tại chưa

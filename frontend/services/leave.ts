@@ -5,4 +5,5 @@ export const leaveService = {
   create: (data: any) => api.post("/leaves", data),
   approve: (id: number) => api.patch(`/leaves/${id}/approve`),
   reject: (id: number, data: any) => api.patch(`/leaves/${id}/reject`, data),
+  getBalance: () => api.get("/leaves/balance"),
 }
