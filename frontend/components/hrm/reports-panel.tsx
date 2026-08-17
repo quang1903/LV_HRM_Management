@@ -518,20 +518,28 @@ export function ReportsPanel() {
                 {isCurrentMonth ? "⏳ Tạm tính (tháng đang diễn ra)" : "✓ Chính thức"}
               </span>
             </div>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => exportToExcel(
-              salaryData,
-              [
-                { key: "full_name", label: "Nhân viên" },
-                { key: "department_name", label: "Phòng ban" },
-                { key: "contract_type", label: "Loại HĐ" },
-                { key: "base_salary", label: "Lương cơ bản" },
-                { key: "work_days", label: "Ngày công" },
-                { key: "leave_days", label: "Ngày phép" },
-                { key: "unexcused_absent", label: "Vắng không phép" },
-                { key: "actual_salary", label: "Lương thực nhận" },
-              ],
-              `Bang_luong_thang_${month}_${year}`
-            )}><Download className="h-4 w-4" />Xuất Excel</Button>
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => {
+              const exportData = salaryData.map(emp => ({
+                ...emp,
+                contract_type: emp.has_contract ? emp.contract_type : "Chưa có HĐ",
+              }))
+              exportToExcel(
+                exportData,
+                [
+                  { key: "full_name", label: "Nhân viên" },
+                  { key: "department_name", label: "Phòng ban" },
+                  { key: "contract_type", label: "Loại HĐ" },
+                  { key: "base_salary", label: "Lương cơ bản" },
+                  { key: "work_days", label: "Ngày công" },
+                  { key: "penalty_days", label: "Ngày bổ sung" },
+                  { key: "leave_days", label: "Ngày phép" },
+                  { key: "overtime_pay", label: "Tiền tăng ca" },
+                  { key: "unexcused_absent", label: "Vắng không phép" },
+                  { key: "actual_salary", label: "Lương thực nhận" },
+                ],
+                `Bang_luong_thang_${month}_${year}`
+              )
+            }}><Download className="h-4 w-4" />Xuất Excel</Button>
           </div>
           {loadingSalary ? <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : (
             <div className="overflow-x-auto">
@@ -543,22 +551,33 @@ export function ReportsPanel() {
                     <th className="px-4 py-3">Loại HĐ</th>
                     <th className="px-4 py-3">Lương cơ bản</th>
                     <th className="px-4 py-3">Ngày công</th>
+                    <th className="px-4 py-3">Ngày bổ sung</th>
                     <th className="px-4 py-3">Ngày phép</th>
+                    <th className="px-4 py-3">Giờ tăng ca</th>
+                    <th className="px-4 py-3">Tiền tăng ca</th>
                     <th className="px-4 py-3">Vắng không phép</th>
                     <th className="px-4 py-3">Lương thực nhận</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {salaryData.length === 0 ? (
-                    <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">Không có dữ liệu tháng {month}/{year}</td></tr>
+                    <tr><td colSpan={11} className="px-4 py-8 text-center text-muted-foreground">Không có dữ liệu tháng {month}/{year}</td></tr>
                   ) : salaryData.map((emp, i) => (
                     <tr key={i} className="hover:bg-muted/40">
-                      <td className="px-4 py-3 font-medium">{emp.full_name}</td>
+                      <td className="px-4 py-3 font-medium">
+                        {emp.full_name}
+                        {!emp.has_contract && (
+                          <span className="ml-2 text-rose-600 text-xs font-normal">⚠ Chưa có HĐ</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-muted-foreground">{emp.department_name}</td>
                       <td className="px-4 py-3 text-muted-foreground">{emp.contract_type || "—"}</td>
                       <td className="px-4 py-3 text-muted-foreground">{formatMoney(emp.base_salary)} đ</td>
                       <td className="px-4 py-3 text-emerald-600 font-medium">{emp.work_days}</td>
+                      <td className="px-4 py-3 text-orange-600 font-medium">{emp.penalty_days || 0}</td>
                       <td className="px-4 py-3 text-blue-600 font-medium">{emp.leave_days}</td>
+                      <td className="px-4 py-3 text-blue-600 font-medium">{((emp.overtime_minutes || 0) / 60).toFixed(1)}h</td>
+                      <td className="px-4 py-3 text-blue-600 font-medium">{formatMoney(emp.overtime_pay)} đ</td>
                       <td className="px-4 py-3 text-rose-600 font-medium">{emp.unexcused_absent}</td>
                       <td className="px-4 py-3 font-semibold text-primary">{formatMoney(emp.actual_salary)} đ</td>
                     </tr>

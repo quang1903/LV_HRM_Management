@@ -3,16 +3,57 @@ import { clearSettingsCache } from "../middlewares/auth.middleware.js"
 
 export async function getSettings(req, res) {
   try {
-    //// 1. Lấy tọa độ công ty , bán kính chấm công cho phép và trạng thái khóa thiết bị id = 1
     const [rows] = await pool.execute(
-      "SELECT company_lat, company_lng, max_distance, device_lock_enabled FROM settings WHERE id = 1"
+      "SELECT company_lat, company_lng, max_distance, device_lock_enabled, work_start_time, work_end_time, overtime_start_time, overtime_end_time, overtime_rate FROM settings WHERE id = 1"
     )
-    //Nếu trong DB chưa tạo dòng id = 1 thì trả về thông số mặc định (bán kính 500m, device_lock tắt)
     if (rows.length === 0) {
-      return res.json({ company_lat: null, company_lng: null, max_distance: 500, device_lock_enabled: 0 })
+      return res.json({ 
+        company_lat: null, company_lng: null, max_distance: 500, device_lock_enabled: 0,
+        work_start_time: '08:30:00', work_end_time: '17:00:00', 
+        overtime_start_time: '17:30:00', overtime_end_time: '19:00:00', overtime_rate: 1.5
+      })
     }
     return res.json(rows[0])
   } catch (err) {
+    return res.status(500).json({ message: "Lỗi server" })
+  }
+}
+
+// Cập nhật giờ làm việc chuẩn, giờ tăng ca, hệ số tăng ca
+export async function updateWorkTimeSettings(req, res) {
+  try {
+    const { work_start_time, work_end_time, overtime_start_time, overtime_end_time, overtime_rate } = req.body
+
+    // ⭐ Validate định dạng giờ HH:MM hoặc HH:MM:SS, chặn giá trị rỗng/sai
+    const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$/
+    const timesToCheck = { work_start_time, work_end_time, overtime_start_time, overtime_end_time }
+    for (const [key, value] of Object.entries(timesToCheck)) {
+      if (!value || !timeRegex.test(value)) {
+        return res.status(400).json({ message: `Giá trị "${key}" không hợp lệ. Vui lòng nhập đúng định dạng giờ (HH:MM).` })
+      }
+    }
+
+    // ⭐ Validate hệ số tăng ca phải là số dương hợp lệ
+    const rate = Number(overtime_rate)
+    if (isNaN(rate) || rate <= 0 || rate > 5) {
+      return res.status(400).json({ message: "Hệ số tăng ca không hợp lệ (phải là số từ 0.1 đến 5)." })
+    }
+    
+    const [existing] = await pool.execute("SELECT id FROM settings WHERE id = 1")
+    if (existing.length === 0) {
+      await pool.execute(
+        "INSERT INTO settings (id, work_start_time, work_end_time, overtime_start_time, overtime_end_time, overtime_rate) VALUES (1, ?, ?, ?, ?, ?)",
+        [work_start_time || '08:30:00', work_end_time || '17:00:00', overtime_start_time || '17:30:00', overtime_end_time || '19:00:00', overtime_rate || 1.5]
+      )
+    } else {
+      await pool.execute(
+        "UPDATE settings SET work_start_time=?, work_end_time=?, overtime_start_time=?, overtime_end_time=?, overtime_rate=? WHERE id=1",
+        [work_start_time || '08:30:00', work_end_time || '17:00:00', overtime_start_time || '17:30:00', overtime_end_time || '19:00:00', overtime_rate || 1.5]
+      )
+    }
+    return res.json({ message: "Cập nhật giờ làm việc thành công" })
+  } catch (err) {
+    console.error(err)
     return res.status(500).json({ message: "Lỗi server" })
   }
 }

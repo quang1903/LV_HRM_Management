@@ -70,11 +70,23 @@ export function MySalaryInfo() {
         <p className="text-sm text-muted-foreground text-center py-8">{error}</p>
       ) : data ? (
         <div className="flex flex-col gap-3">
+          {!data.has_contract && (
+            <div className="rounded-md bg-rose-50 px-3 py-2 text-xs text-rose-700 mb-1">
+              ⚠ Bạn chưa có hợp đồng lao động đang hiệu lực. Vui lòng liên hệ HR để được cấp hợp đồng.
+            </div>
+          )}
           {[
             { label: "Loại hợp đồng", value: data.contract_type || "—" },
             { label: "Lương cơ bản", value: `${formatMoney(data.base_salary)} đ` },
             { label: "Ngày công thực tế", value: `${data.work_days} ngày` },
+            { label: "— Đúng giờ", value: `${data.ontime_days || 0} ngày` },
+            { label: "— Đi trễ", value: `${data.late_days || 0} ngày` },
+            { label: "— Về sớm", value: `${data.early_leave_days || 0} ngày` },
+            { label: "Ngày công bổ sung (phạt 20%)", value: `${data.penalty_days || 0} ngày` },
             { label: "Ngày nghỉ phép (có lương)", value: `${data.leave_days} ngày` },
+            { label: "Tổng giờ làm việc", value: `${data.total_work_hours || "0.0"} giờ` },
+            { label: "Giờ tăng ca", value: `${((data.overtime_minutes || 0) / 60).toFixed(1)} giờ` },
+            { label: "Tiền tăng ca (x1.5)", value: `${formatMoney(data.overtime_pay)} đ` },
             { label: "Vắng không phép", value: `${data.unexcused_absent} ngày` },
           ].map(item => (
             <div key={item.label} className="flex justify-between border-b border-border pb-2">

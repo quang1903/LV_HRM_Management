@@ -168,7 +168,12 @@ export async function getSalaryReport(req, res) {
         d.name as department_name,
         c.salary as base_salary,
         c.contract_type,
-        COALESCE(att.work_days, 0) as work_days,
+        COALESCE(att.ontime_days, 0) as ontime_days,
+        COALESCE(att.late_days, 0) as late_days,
+        COALESCE(att.early_leave_days, 0) as early_leave_days,
+        COALESCE(att.total_work_minutes, 0) as total_work_minutes,
+        COALESCE(att.penalty_days, 0) as penalty_days,
+        COALESCE(att.total_overtime_minutes, 0) as overtime_minutes,
         COALESCE(att.absent_days, 0) as absent_days,
         COALESCE(lv.leave_days, 0) as leave_days
       FROM employees e
@@ -177,21 +182,32 @@ export async function getSalaryReport(req, res) {
       LEFT JOIN (
         SELECT 
           employee_id,
-          COUNT(CASE WHEN status IN ('Dung gio','Di tre','Ve som') THEN 1 END) as work_days,
-          COUNT(CASE WHEN status = 'Vang mat' THEN 1 END) as absent_days
+          COUNT(CASE WHEN status = 'Dung gio' AND is_supplemented = 0 THEN 1 END) as ontime_days,
+          COUNT(CASE WHEN status = 'Di tre' AND is_supplemented = 0 THEN 1 END) as late_days,
+          COUNT(CASE WHEN status = 'Ve som' AND is_supplemented = 0 THEN 1 END) as early_leave_days,
+          COUNT(CASE WHEN status IN ('Dung gio','Di tre','Ve som') AND is_supplemented = 1 THEN 1 END) as penalty_days,
+          COUNT(CASE WHEN status = 'Vang mat' THEN 1 END) as absent_days,
+          SUM(work_minutes) as total_work_minutes,
+          SUM(overtime_minutes) as total_overtime_minutes
         FROM attendances
         WHERE work_date BETWEEN ? AND ?
         GROUP BY employee_id
       ) att ON att.employee_id = e.id
       LEFT JOIN (
         SELECT 
-          employee_id,
-          SUM(total_days) as leave_days
-        FROM leave_requests
-        WHERE start_date BETWEEN ? AND ? 
-          AND status = 'Da duyet'
-          AND request_type != 'Nghi khong luong'
-        GROUP BY employee_id
+          a.employee_id,
+          COUNT(*) as leave_days
+        FROM attendances a
+        WHERE a.work_date BETWEEN ? AND ?
+        AND a.status = 'Vang mat'
+        AND EXISTS (
+          SELECT 1 FROM leave_requests l 
+          WHERE l.employee_id = a.employee_id 
+          AND l.status = 'Da duyet'
+          AND l.request_type != 'Nghi khong luong'
+          AND a.work_date BETWEEN l.start_date AND l.end_date
+        )
+        GROUP BY a.employee_id
       ) lv ON lv.employee_id = e.id
       WHERE e.status = 'Dang lam'
       ORDER BY d.name, e.full_name
@@ -199,6 +215,7 @@ export async function getSalaryReport(req, res) {
 
     const STANDARD_WORKDAYS = 26
     const PROBATION_RATE = 0.85
+    const PENALTY_RATE = 0.8
 
     const result = rows.map(r => {
       const typeStr = (r.contract_type || "").trim().toLowerCase()
@@ -206,9 +223,35 @@ export async function getSalaryReport(req, res) {
       const rate = isProbation ? PROBATION_RATE : 1.0
       const baseSalary = Number(r.base_salary || 0)
       const dailyRate = baseSalary > 0 ? baseSalary / STANDARD_WORKDAYS : 0
-      const actualSalary = Math.round(dailyRate * (Number(r.work_days) + Number(r.leave_days)) * rate)
-      const unexcusedAbsent = Math.max(0, Number(r.absent_days) - Number(r.leave_days))
-      return { ...r, actual_salary: actualSalary, unexcused_absent: unexcusedAbsent }
+
+      const normalDays = Number(r.ontime_days) + Number(r.late_days) + Number(r.early_leave_days)
+      const penaltyDays = Number(r.penalty_days)
+      const leaveDays = Number(r.leave_days)
+
+      const totalPayableDays = normalDays + (penaltyDays * PENALTY_RATE) + leaveDays
+      const baseActualSalary = Math.round(dailyRate * totalPayableDays * rate)
+
+      const overtimeHours = Number(r.overtime_minutes || 0) / 60
+      const overtimeRate = 1.5
+      const hourlyRate = dailyRate / 8
+      const overtimePay = Math.round(hourlyRate * overtimeHours * overtimeRate)
+
+      const unexcusedAbsent = Math.max(0, Number(r.absent_days) - leaveDays)
+      const hasContract = baseSalary > 0
+
+      return { 
+        ...r, 
+        ontime_days: Number(r.ontime_days),
+        late_days: Number(r.late_days),
+        early_leave_days: Number(r.early_leave_days),
+        total_work_hours: (Number(r.total_work_minutes || 0) / 60).toFixed(1),
+        work_days: normalDays + penaltyDays,
+        penalty_days: penaltyDays,
+        actual_salary: baseActualSalary + overtimePay,
+        overtime_pay: overtimePay,
+        unexcused_absent: unexcusedAbsent,
+        has_contract: hasContract
+      }
     })
 
     return res.json(result)
@@ -241,7 +284,12 @@ export async function getMySalaryReport(req, res) {
         d.name as department_name,
         c.salary as base_salary,
         c.contract_type,
-        COALESCE(att.work_days, 0) as work_days,
+        COALESCE(att.ontime_days, 0) as ontime_days,
+        COALESCE(att.late_days, 0) as late_days,
+        COALESCE(att.early_leave_days, 0) as early_leave_days,
+        COALESCE(att.total_work_minutes, 0) as total_work_minutes,
+        COALESCE(att.penalty_days, 0) as penalty_days,
+        COALESCE(att.total_overtime_minutes, 0) as overtime_minutes,
         COALESCE(att.absent_days, 0) as absent_days,
         COALESCE(lv.leave_days, 0) as leave_days
       FROM employees e
@@ -250,22 +298,33 @@ export async function getMySalaryReport(req, res) {
       LEFT JOIN (
         SELECT 
           employee_id,
-          COUNT(CASE WHEN status IN ('Dung gio','Di tre','Ve som') THEN 1 END) as work_days,
-          COUNT(CASE WHEN status = 'Vang mat' THEN 1 END) as absent_days
+          COUNT(CASE WHEN status = 'Dung gio' AND is_supplemented = 0 THEN 1 END) as ontime_days,
+          COUNT(CASE WHEN status = 'Di tre' AND is_supplemented = 0 THEN 1 END) as late_days,
+          COUNT(CASE WHEN status = 'Ve som' AND is_supplemented = 0 THEN 1 END) as early_leave_days,
+          COUNT(CASE WHEN status IN ('Dung gio','Di tre','Ve som') AND is_supplemented = 1 THEN 1 END) as penalty_days,
+          COUNT(CASE WHEN status = 'Vang mat' THEN 1 END) as absent_days,
+          SUM(work_minutes) as total_work_minutes,
+          SUM(overtime_minutes) as total_overtime_minutes
         FROM attendances
         WHERE work_date BETWEEN ? AND ? AND employee_id = ?
         GROUP BY employee_id
       ) att ON att.employee_id = e.id
       LEFT JOIN (
         SELECT 
-          employee_id,
-          SUM(total_days) as leave_days
-        FROM leave_requests
-        WHERE start_date BETWEEN ? AND ? 
-          AND status = 'Da duyet' 
-          AND employee_id = ?
-          AND request_type != 'Nghi khong luong'
-        GROUP BY employee_id
+          a.employee_id,
+          COUNT(*) as leave_days
+        FROM attendances a
+        WHERE a.work_date BETWEEN ? AND ?
+        AND a.employee_id = ?
+        AND a.status = 'Vang mat'
+        AND EXISTS (
+          SELECT 1 FROM leave_requests l 
+          WHERE l.employee_id = a.employee_id 
+          AND l.status = 'Da duyet'
+          AND l.request_type != 'Nghi khong luong'
+          AND a.work_date BETWEEN l.start_date AND l.end_date
+        )
+        GROUP BY a.employee_id
       ) lv ON lv.employee_id = e.id
       WHERE e.id = ?
     `, [startDate, endDate, req.user.employee_id, startDate, endDate, req.user.employee_id, req.user.employee_id])
@@ -276,6 +335,7 @@ export async function getMySalaryReport(req, res) {
 
     const STANDARD_WORKDAYS = 26
     const PROBATION_RATE = 0.85
+    const PENALTY_RATE = 0.8
     const r = rows[0]
 
     const typeStr = (r.contract_type || "").trim().toLowerCase()
@@ -283,10 +343,35 @@ export async function getMySalaryReport(req, res) {
     const rate = isProbation ? PROBATION_RATE : 1.0
     const baseSalary = Number(r.base_salary || 0)
     const dailyRate = baseSalary > 0 ? baseSalary / STANDARD_WORKDAYS : 0
-    const actualSalary = Math.round(dailyRate * (Number(r.work_days) + Number(r.leave_days)) * rate)
-    const unexcusedAbsent = Math.max(0, Number(r.absent_days) - Number(r.leave_days))
 
-    return res.json({ ...r, actual_salary: actualSalary, unexcused_absent: unexcusedAbsent })
+    const normalDays = Number(r.ontime_days) + Number(r.late_days) + Number(r.early_leave_days)
+    const penaltyDays = Number(r.penalty_days)
+    const leaveDays = Number(r.leave_days)
+
+    const totalPayableDays = normalDays + (penaltyDays * PENALTY_RATE) + leaveDays
+    const baseActualSalary = Math.round(dailyRate * totalPayableDays * rate)
+
+    const overtimeHours = Number(r.overtime_minutes || 0) / 60
+    const overtimeRate = 1.5
+    const hourlyRate = dailyRate / 8
+    const overtimePay = Math.round(hourlyRate * overtimeHours * overtimeRate)
+
+    const unexcusedAbsent = Math.max(0, Number(r.absent_days) - leaveDays)
+    const hasContract = baseSalary > 0
+
+    return res.json({ 
+      ...r, 
+      ontime_days: Number(r.ontime_days),
+      late_days: Number(r.late_days),
+      early_leave_days: Number(r.early_leave_days),
+      total_work_hours: (Number(r.total_work_minutes || 0) / 60).toFixed(1),
+      work_days: normalDays + penaltyDays,
+      penalty_days: penaltyDays,
+      actual_salary: baseActualSalary + overtimePay,
+      overtime_pay: overtimePay,
+      unexcused_absent: unexcusedAbsent,
+      has_contract: hasContract
+    })
   } catch (err) {
     console.error(err)
     return res.status(500).json({ message: "Lỗi server" })

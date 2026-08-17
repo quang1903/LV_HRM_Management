@@ -46,7 +46,7 @@ function getInitials(name: string) {
 
 // Định dạng tiền lương
 function formatSalary(salary: number) {
-  return salary?.toLocaleString("vi-VN") || "0"
+  return Number(salary || 0).toLocaleString("vi-VN")
 }
 // HÀM TÍNH TOÁN TRẠNG THÁI HỢP ĐỒNG THEO NGÀY HIỆN TẠI 
 function getDisplayStatus(status: string, end_date: string | null) {
@@ -223,7 +223,6 @@ export function ContractTable() {
                 <th className="px-5 py-3">Loại HĐ</th>
                 <th className="px-5 py-3">Ngày bắt đầu</th>
                 <th className="px-5 py-3">Ngày kết thúc</th>
-                <th className="px-5 py-3">Ngày tạo</th>
                 <th className="px-5 py-3">Lương</th>
                 <th className="px-5 py-3">Trạng thái</th>
                 <th className="px-5 py-3 text-right">Hành động</th>
@@ -254,8 +253,6 @@ export function ContractTable() {
                     <td className="px-5 py-4 text-muted-foreground">{formatDate(contract.start_date)}</td>
                     {/* Ngày kết thúc */}
                     <td className="px-5 py-4 text-muted-foreground">{contract.end_date ? formatDate(contract.end_date) : "Không xác định"}</td>
-                    {/* Ngày tạo */}
-                    <td className="px-5 py-4 text-muted-foreground">{contract.created_at ? formatDate(contract.created_at) : "-"}</td>
                     {/* Lương */}
                     <td className="px-5 py-4 font-medium">{formatSalary(contract.salary)} đ</td>
                     {/* Trạng thái */}

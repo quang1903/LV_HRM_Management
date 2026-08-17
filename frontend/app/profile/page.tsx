@@ -6,6 +6,7 @@ import { MyQRCode } from "@/components/hrm/my-qr-code"
 import { MyProfileInfo } from "@/components/hrm/my-profile-info"
 import { ChangePasswordForm } from "@/components/hrm/change-password-form"
 import { MySalaryInfo } from "@/components/hrm/my-salary-info"
+import { LeaveBalanceInfo } from "@/components/hrm/leave-balance-info"
 import { Card } from "@/components/ui/card"
 
 export default function ProfilePage() {
@@ -22,6 +23,8 @@ export default function ProfilePage() {
 
           <div className="flex flex-col gap-4">
             <MyProfileInfo />
+
+            <LeaveBalanceInfo />
 
             <MySalaryInfo />
 

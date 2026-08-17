@@ -20,6 +20,9 @@ type Attendance = {
   check_out: string | null
   work_minutes: number
   status: string
+  display_status?: string
+  leave_type?: string
+  is_supplemented?: number
 }
 
 const statusStyles: Record<string, string> = {
@@ -27,6 +30,10 @@ const statusStyles: Record<string, string> = {
   "Di tre":   "bg-amber-50 text-amber-700 ring-amber-600/20",
   "Ve som":   "bg-blue-50 text-blue-700 ring-blue-600/20",
   "Vang mat": "bg-rose-50 text-rose-700 ring-rose-600/20",
+  "Nghi phep": "bg-violet-50 text-violet-700 ring-violet-600/20",
+  "Nghi om": "bg-violet-50 text-violet-700 ring-violet-600/20",
+  "Nghi thai san": "bg-violet-50 text-violet-700 ring-violet-600/20",
+  "Nghi khong luong": "bg-slate-50 text-slate-600 ring-slate-600/20",
 }
 
 const statusLabel: Record<string, string> = {
@@ -34,6 +41,10 @@ const statusLabel: Record<string, string> = {
   "Di tre":   "Đi trễ",
   "Ve som":   "Về sớm",
   "Vang mat": "Vắng mặt",
+  "Nghi phep": "Nghỉ phép",
+  "Nghi om": "Nghỉ ốm",
+  "Nghi thai san": "Nghỉ thai sản",
+  "Nghi khong luong": "Nghỉ không lương",
 }
 
 function getInitials(name: string) {
@@ -102,7 +113,7 @@ export function AttendanceTable() {
       a.full_name?.toLowerCase().includes(search.toLowerCase()) ||
       a.department_name?.toLowerCase().includes(search.toLowerCase()) ||
       a.employee_code?.toLowerCase().includes(search.toLowerCase())
-    const matchStatus = filterStatus ? a.status === filterStatus : true
+    const matchStatus = filterStatus ? (a.display_status || a.status) === filterStatus : true
     if (user?.role === "employee") return a.employee_id === user.employee_id && matchSearch && matchStatus
     return matchSearch && matchStatus
   })
@@ -114,9 +125,10 @@ export function AttendanceTable() {
     if (!editAttendance) return
     try {
       await attendanceService.update(editAttendance.id, {
-        check_in:  editAttendance.check_in,
-        check_out: editAttendance.check_out,
-        status:    editAttendance.status,
+        check_in:        editAttendance.check_in,
+        check_out:       editAttendance.check_out,
+        status:          editAttendance.status,
+        is_supplemented: editAttendance.is_supplemented,
       })
       setEditAttendance(null)
       fetchAttendances()
@@ -147,10 +159,10 @@ export function AttendanceTable() {
   }
 
   const stats = [
-    { label: "Đúng giờ", value: filtered.filter(a => a.status === "Dung gio").length, color: "text-emerald-600" },
-    { label: "Đi trễ",   value: filtered.filter(a => a.status === "Di tre").length,   color: "text-amber-600" },
-    { label: "Về sớm",   value: filtered.filter(a => a.status === "Ve som").length,   color: "text-blue-600" },
-    { label: "Vắng mặt", value: filtered.filter(a => a.status === "Vang mat").length, color: "text-rose-600" },
+    { label: "Đúng giờ", value: filtered.filter(a => (a.display_status || a.status) === "Dung gio").length, color: "text-emerald-600" },
+    { label: "Đi trễ",   value: filtered.filter(a => (a.display_status || a.status) === "Di tre").length,   color: "text-amber-600" },
+    { label: "Về sớm",   value: filtered.filter(a => (a.display_status || a.status) === "Ve som").length,   color: "text-blue-600" },
+    { label: "Vắng mặt", value: filtered.filter(a => (a.display_status || a.status) === "Vang mat").length, color: "text-rose-600" },
   ]
 
   if (loading) {
@@ -203,6 +215,10 @@ export function AttendanceTable() {
               <option value="Di tre">Đi trễ</option>
               <option value="Ve som">Về sớm</option>
               <option value="Vang mat">Vắng mặt</option>
+              <option value="Nghi phep">Nghỉ phép</option>
+              <option value="Nghi om">Nghỉ ốm</option>
+              <option value="Nghi thai san">Nghỉ thai sản</option>
+              <option value="Nghi khong luong">Nghỉ không lương</option>
             </select>
             {canEdit && (
               <Button size="sm" className="gap-2" onClick={() => setShowAdd(true)}>
@@ -249,8 +265,8 @@ export function AttendanceTable() {
                       : "—"}
                   </td>
                   <td className="px-5 py-4">
-                    <span className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset", statusStyles[att.status] || "bg-slate-100 text-slate-600")}>
-                      {statusLabel[att.status] || att.status}
+                    <span className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset", statusStyles[att.display_status || att.status] || "bg-slate-100 text-slate-600")}>
+                      {statusLabel[att.display_status || att.status] || att.display_status || att.status}
                     </span>
                   </td>
                   <td className="px-5 py-4">
@@ -322,6 +338,22 @@ export function AttendanceTable() {
                   >
                     {Object.entries(statusLabel).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
+                </div>
+
+                {/* ⭐ Thêm mới: checkbox phạt lương */}
+                <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
+                  <input
+                    type="checkbox"
+                    id="is_supplemented"
+                    checked={editAttendance.is_supplemented === 1}
+                    onChange={e => setEditAttendance({ ...editAttendance, is_supplemented: e.target.checked ? 1 : 0 })}
+                    className="mt-0.5 h-4 w-4 rounded border-input"
+                  />
+                  <label htmlFor="is_supplemented" className="text-sm text-amber-800">
+                    Đánh dấu là <span className="font-medium">bổ sung do quên chấm công</span>
+                    <br />
+                    <span className="text-xs text-amber-700">Ngày này sẽ bị trừ 20% lương nếu tick chọn</span>
+                  </label>
                 </div>
               </div>
               <div className="flex gap-2 mt-4">

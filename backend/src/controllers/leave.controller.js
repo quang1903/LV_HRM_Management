@@ -74,6 +74,18 @@ export async function createLeave(req, res) {
       employee_id = req.user.employee_id
     }
 
+    // ⭐ MỚI: Chống IDOR cho Manager — chỉ được xin nghỉ hộ nhân viên thuộc phòng ban mình quản lý
+    if (req.user.role === "manager" && employee_id && Number(employee_id) !== Number(req.user.employee_id)) {
+      const [empCheck] = await pool.execute(
+        `SELECT e.id FROM employees e 
+         WHERE e.id = ? AND e.department_id IN (SELECT id FROM departments WHERE manager_id = ?)`,
+        [employee_id, req.user.employee_id]
+      )
+      if (empCheck.length === 0) {
+        return res.status(403).json({ message: "Bạn chỉ được gửi đơn nghỉ phép hộ nhân viên thuộc phòng ban mình quản lý" })
+      }
+    }
+
     if (!employee_id || !request_type || !start_date || !end_date) {
       return res.status(400).json({ message: "Vui lòng nhập đầy đủ thông tin bắt buộc" })
     }
@@ -284,19 +296,6 @@ export async function rejectLeave(req, res) {
       "UPDATE leave_requests SET status='Tu choi', reject_reason=?, approved_by=?, approved_at=NOW() WHERE id=?",
       [reject_reason, req.user.id, req.params.id]
     )
-
-    // Xóa các bản ghi Vắng mặt nếu đơn đã từng được duyệt (hoặc dọn dẹp)
-    const [leaveRows] = await pool.execute(
-      "SELECT employee_id, start_date, end_date FROM leave_requests WHERE id = ?",
-      [req.params.id]
-    )
-    if (leaveRows.length > 0) {
-      const { employee_id, start_date, end_date } = leaveRows[0]
-      await pool.execute(
-        "DELETE FROM attendances WHERE employee_id = ? AND work_date BETWEEN ? AND ? AND status = 'Vang mat' AND check_in IS NULL",
-        [employee_id, start_date, end_date]
-      )
-    }
 
     return res.json({ message: "Từ chối đơn thành công" })
   } catch (err) {

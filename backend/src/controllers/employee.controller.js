@@ -383,6 +383,7 @@ export async function permanentDelete(req, res) {
     // Xóa dữ liệu liên quan trước tránh lỗi Foreign Key Constraint
     await pool.execute("DELETE FROM attendances WHERE employee_id = ?", [req.params.id]) // Xóa lịch sử chấm công
     await pool.execute("DELETE FROM leave_requests WHERE employee_id = ?", [req.params.id]) // Xóa yêu cầu nghỉ phép
+    await pool.execute("UPDATE leave_requests SET approved_by = NULL WHERE approved_by = ?", [req.params.id]) // Gỡ tham chiếu người duyệt đơn
     await pool.execute("DELETE FROM contracts WHERE employee_id = ?", [req.params.id]) // Xóa hợp đồng
     await pool.execute("DELETE FROM profile_change_requests WHERE employee_id = ?", [req.params.id]) // Xóa yêu cầu thay đổi thông tin
     await pool.execute("UPDATE departments SET manager_id = NULL WHERE manager_id = ?", [req.params.id]) // Xóa manager_id nếu đang là Trưởng phòng

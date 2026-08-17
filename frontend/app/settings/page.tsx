@@ -5,7 +5,7 @@ import { Sidebar } from "@/components/hrm/sidebar"
 import { Topbar } from "@/components/hrm/topbar"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { MapPin, Loader2, Lock, Unlock, ScanLine } from "lucide-react"
+import { MapPin, Loader2, Lock, Unlock, ScanLine, Clock } from "lucide-react"
 import { settingsService } from "@/services/settings"
 import axios from "axios"
 
@@ -23,6 +23,13 @@ export default function SettingsPage() {
   const [scanPassword, setScanPassword] = useState("")
   const [savingScanPassword, setSavingScanPassword] = useState(false)
 
+  const [workStartTime, setWorkStartTime] = useState("08:30")
+  const [workEndTime, setWorkEndTime] = useState("17:00")
+  const [overtimeStartTime, setOvertimeStartTime] = useState("17:30")
+  const [overtimeEndTime, setOvertimeEndTime] = useState("19:00")
+  const [overtimeRate, setOvertimeRate] = useState("1.5")
+  const [savingWorkTime, setSavingWorkTime] = useState(false)
+
   useEffect(() => {
     settingsService.get().then(res => {
       if (res.data.company_lat) {
@@ -31,6 +38,11 @@ export default function SettingsPage() {
         setMaxDistance(String(res.data.max_distance || 500))
       }
       setDeviceLockEnabled(!!res.data.device_lock_enabled)
+      setWorkStartTime((res.data.work_start_time || "08:30:00").substring(0, 5))
+      setWorkEndTime((res.data.work_end_time || "17:00:00").substring(0, 5))
+      setOvertimeStartTime((res.data.overtime_start_time || "17:30:00").substring(0, 5))
+      setOvertimeEndTime((res.data.overtime_end_time || "19:00:00").substring(0, 5))
+      setOvertimeRate(String(res.data.overtime_rate || 1.5))
     }).catch(() => {})
   }, [])
 
@@ -104,6 +116,24 @@ export default function SettingsPage() {
       alert(err.response?.data?.message || "Lỗi khi lưu")
     } finally {
       setSavingScanPassword(false)
+    }
+  }
+
+  const handleSaveWorkTime = async () => {
+    try {
+      setSavingWorkTime(true)
+      await settingsService.updateWorkTime({
+        work_start_time: workStartTime + ":00",
+        work_end_time: workEndTime + ":00",
+        overtime_start_time: overtimeStartTime + ":00",
+        overtime_end_time: overtimeEndTime + ":00",
+        overtime_rate: Number(overtimeRate),
+      })
+      alert("Đã lưu cấu hình giờ làm việc!")
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Lỗi khi lưu")
+    } finally {
+      setSavingWorkTime(false)
     }
   }
 
@@ -216,6 +246,47 @@ export default function SettingsPage() {
                 {savingScanPassword ? <Loader2 className="h-4 w-4 animate-spin" /> : "Lưu"}
               </Button>
             </div>
+          </Card>
+
+          <Card className="p-6 lg:col-span-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Clock className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold">Giờ làm việc & Tăng ca</h3>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Cấu hình mốc giờ tính Đúng giờ/Đi trễ/Về sớm và giờ tính tăng ca cho toàn công ty.
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div>
+                <label className="text-sm text-muted-foreground">Giờ vào chuẩn</label>
+                <input type="time" className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 ring-ring/40"
+                  value={workStartTime} onChange={e => setWorkStartTime(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground">Giờ ra chuẩn</label>
+                <input type="time" className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 ring-ring/40"
+                  value={workEndTime} onChange={e => setWorkEndTime(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground">Bắt đầu tăng ca</label>
+                <input type="time" className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 ring-ring/40"
+                  value={overtimeStartTime} onChange={e => setOvertimeStartTime(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground">Kết thúc tăng ca</label>
+                <input type="time" className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 ring-ring/40"
+                  value={overtimeEndTime} onChange={e => setOvertimeEndTime(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground">Hệ số lương tăng ca</label>
+                <input type="number" step="0.1" className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 ring-ring/40"
+                  value={overtimeRate} onChange={e => setOvertimeRate(e.target.value)} />
+              </div>
+            </div>
+            <Button className="mt-4" onClick={handleSaveWorkTime} disabled={savingWorkTime}>
+              {savingWorkTime ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Lưu cấu hình
+            </Button>
           </Card>
           </div>
         </main>

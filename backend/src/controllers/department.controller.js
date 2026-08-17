@@ -38,17 +38,31 @@ export async function createDepartment(req, res) {
   try {
     const { name, description, manager_id } = req.body
     if (!name) return res.status(400).json({ message: "Vui lòng nhập tên phòng ban" })
+
+    // Chặn nếu người được chọn làm Trưởng phòng đang giữ vai trò Admin hoặc HR
+    if (manager_id) {
+      const [managerUser] = await pool.execute(
+        "SELECT role FROM users WHERE employee_id = ?", [manager_id]
+      )
+      if (managerUser.length > 0 && (managerUser[0].role === 'admin' || managerUser[0].role === 'hr')) {
+        const roleName = managerUser[0].role === 'admin' ? 'Admin' : 'HR'
+        return res.status(400).json({ 
+          message: `Nhân viên này đang giữ vai trò ${roleName}, không thể gán làm Trưởng phòng ban. Vui lòng đổi vai trò tài khoản trước nếu muốn gán.` 
+        })
+      }
+    }
+
     const [result] = await pool.execute(
       "INSERT INTO departments (name, description, manager_id) VALUES (?, ?, ?)",
       [name, description || null, manager_id || null]
     )
 
-    //Xử lý nâng quyền tự động: Nếu phòng ban mới tạo có gán Trưởng phòng
+    // Xử lý nâng quyền tự động: Chỉ nâng quyền nếu người đó đang là employee
     if (manager_id) {
       const [managerUser] = await pool.execute(
         "SELECT role FROM users WHERE employee_id = ?", [manager_id]
       )
-      if (managerUser.length > 0 && managerUser[0].role !== 'admin' && managerUser[0].role !== 'hr') {
+      if (managerUser.length > 0 && managerUser[0].role === 'employee') {
         await pool.execute("UPDATE users SET role = 'manager' WHERE employee_id = ?", [manager_id])
       }
     }
@@ -60,96 +74,105 @@ export async function createDepartment(req, res) {
 }
 
 export async function updateDepartment(req, res) {
-  const conn = await pool.getConnection()
   try {
-    //để đảm bảo nếu quá trình cập nhật bị lỗi giữa chừng, toàn bộ các bước sẽ được Rollback
-    await conn.beginTransaction()
-
     const { name, description, manager_id } = req.body
-    //kt database
-    const [existing] = await conn.execute("SELECT id, manager_id FROM departments WHERE id = ?", [req.params.id])
-    if (existing.length === 0) {
-      await conn.rollback()
-      conn.release()
+    const newManagerId = manager_id || null
+
+    const [existingCheck] = await pool.execute("SELECT id, manager_id FROM departments WHERE id = ?", [req.params.id])
+    if (existingCheck.length === 0) {
       return res.status(404).json({ message: "Không tìm thấy phòng ban" })
     }
 
-    const oldManagerId = existing[0].manager_id
-    const newManagerId = manager_id || null
-    let warningMessage = ""
+    const oldManagerId = existingCheck[0].manager_id
 
-    // Nếu có gán Trưởng phòng mới và khác với người cũ
+    // Chặn ngay từ đầu nếu Trưởng phòng mới được chọn đang giữ vai trò Admin hoặc HR
     if (newManagerId && newManagerId !== oldManagerId) {
-      //tim user id
-      const [newManagerUser] = await conn.execute(
+      const [newManagerUserCheck] = await pool.execute(
         "SELECT id, role FROM users WHERE employee_id = ?",
         [newManagerId]
       )
-      if (newManagerUser.length > 0 && newManagerUser[0].role !== "admin" && newManagerUser[0].role !== "manager") {
-        await conn.execute("UPDATE users SET role = 'manager' WHERE employee_id = ?", [newManagerId])
-        warningMessage += " Đã tự động nâng quyền tài khoản Trưởng phòng mới lên Quản lý."
-      }
-
-      // Tự động gán chức vụ Trưởng phòng cho người mới
-      const [leaderPos] = await conn.execute(
-        "SELECT id FROM positions WHERE department_id = ? AND name LIKE 'Trưởng phòng%' LIMIT 1",
-        [req.params.id]
-      )
-      //Nếu tìm thấy chức vụ Trưởng phòng -> Cập nhật position_id này cho Nhân viên mới
-      if (leaderPos.length > 0) {
-        await conn.execute(
-          "UPDATE employees SET position_id = ? WHERE id = ?",
-          [leaderPos[0].id, newManagerId]
-        )
+      if (newManagerUserCheck.length > 0 && (newManagerUserCheck[0].role === "admin" || newManagerUserCheck[0].role === "hr")) {
+        const roleName = newManagerUserCheck[0].role === 'admin' ? 'Admin' : 'HR'
+        return res.status(400).json({
+          message: `Nhân viên này đang giữ vai trò ${roleName}, không thể gán làm Trưởng phòng ban. Vui lòng đổi vai trò tài khoản trước nếu muốn gán.`
+        })
       }
     }
-//----------------------------
-    // Nếu đổi qua người khác, kiểm tra hạ role người cũ
-    if (oldManagerId && oldManagerId !== newManagerId) {
-      //Kiểm tra xem Trưởng phòng cũ này có đang làm Trưởng phòng ở phòng ban NÀO KHÁC nữa không
-      const [otherDepts] = await conn.execute(
-        "SELECT id FROM departments WHERE manager_id = ? AND id != ?",
-        [oldManagerId, req.params.id]
-      )
-      //Nếu người cũ KHÔNG còn làm Trưởng phòng ở bất kỳ phòng ban nào khác nữa 
-      if (otherDepts.length === 0) {
-        const [oldManagerUser] = await conn.execute(
+
+    const conn = await pool.getConnection()
+    try {
+      await conn.beginTransaction()
+
+      let warningMessage = ""
+
+      // Nếu có gán Trưởng phòng mới và khác với người cũ
+      if (newManagerId && newManagerId !== oldManagerId) {
+        const [newManagerUser] = await conn.execute(
           "SELECT id, role FROM users WHERE employee_id = ?",
-          [oldManagerId]
+          [newManagerId]
         )
-        //Nếu tài khoản đang là 'manager' -> Hạ quyền về lại 'employee'
-        if (oldManagerUser.length > 0 && oldManagerUser[0].role === "manager") {
-          await conn.execute("UPDATE users SET role = 'employee' WHERE employee_id = ?", [oldManagerId])
-          warningMessage += " Đã tự động hạ quyền tài khoản Trưởng phòng cũ về Nhân viên (không còn quản lý phòng nào)."
+        if (newManagerUser.length > 0 && newManagerUser[0].role === "employee") {
+          await conn.execute("UPDATE users SET role = 'manager' WHERE employee_id = ?", [newManagerId])
+          warningMessage += " Đã tự động nâng quyền tài khoản Trưởng phòng mới lên Quản lý."
+        }
+
+        // Tự động gán chức vụ Trưởng phòng cho người mới
+        const [leaderPos] = await conn.execute(
+          "SELECT id FROM positions WHERE department_id = ? AND name LIKE 'Trưởng phòng%' LIMIT 1",
+          [req.params.id]
+        )
+        if (leaderPos.length > 0) {
+          await conn.execute(
+            "UPDATE employees SET position_id = ? WHERE id = ?",
+            [leaderPos[0].id, newManagerId]
+          )
         }
       }
 
-      // Tự động bỏ chức vụ Trưởng phòng của người cũ — tìm chức vụ thường
-      const [normalPos] = await conn.execute(
-        "SELECT id FROM positions WHERE department_id = ? AND name NOT LIKE 'Trưởng phòng%' LIMIT 1",
-        [req.params.id]
-      )
-      //Chuyển chức vụ của Trưởng phòng cũ về lại chức vụ nhân viên thường 
-      if (normalPos.length > 0) {
-        await conn.execute(
-          "UPDATE employees SET position_id = ? WHERE id = ?",
-          [normalPos[0].id, oldManagerId]
+      // Nếu đổi qua người khác, kiểm tra hạ role người cũ
+      if (oldManagerId && oldManagerId !== newManagerId) {
+        const [otherDepts] = await conn.execute(
+          "SELECT id FROM departments WHERE manager_id = ? AND id != ?",
+          [oldManagerId, req.params.id]
         )
+        if (otherDepts.length === 0) {
+          const [oldManagerUser] = await conn.execute(
+            "SELECT id, role FROM users WHERE employee_id = ?",
+            [oldManagerId]
+          )
+          if (oldManagerUser.length > 0 && oldManagerUser[0].role === "manager") {
+            await conn.execute("UPDATE users SET role = 'employee' WHERE employee_id = ?", [oldManagerId])
+            warningMessage += " Đã tự động hạ quyền tài khoản Trưởng phòng cũ về Nhân viên (không còn quản lý phòng nào)."
+          }
+        }
+
+        const [normalPos] = await conn.execute(
+          "SELECT id FROM positions WHERE department_id = ? AND name NOT LIKE 'Trưởng phòng%' LIMIT 1",
+          [req.params.id]
+        )
+        if (normalPos.length > 0) {
+          await conn.execute(
+            "UPDATE employees SET position_id = ? WHERE id = ?",
+            [normalPos[0].id, oldManagerId]
+          )
+        }
       }
+
+      await conn.execute(
+        "UPDATE departments SET name=?, description=?, manager_id=? WHERE id=?",
+        [name, description || null, newManagerId, req.params.id]
+      )
+
+      await conn.commit()
+      conn.release()
+      return res.json({ message: `Cập nhật phòng ban thành công.${warningMessage}` })
+    } catch (err) {
+      await conn.rollback()
+      conn.release()
+      console.error(err)
+      return res.status(500).json({ message: "Lỗi server" })
     }
-
-    //Cập nhật thông tin 
-    await conn.execute(
-      "UPDATE departments SET name=?, description=?, manager_id=? WHERE id=?",
-      [name, description || null, newManagerId, req.params.id]
-    )
-
-    await conn.commit()
-    conn.release()
-    return res.json({ message: `Cập nhật phòng ban thành công.${warningMessage}` })
   } catch (err) {
-    await conn.rollback()
-    conn.release()
     console.error(err)
     return res.status(500).json({ message: "Lỗi server" })
   }
